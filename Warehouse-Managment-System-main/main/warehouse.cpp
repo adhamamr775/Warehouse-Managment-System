@@ -10,42 +10,33 @@
 using namespace std;
 
 // ==========================================
-// CONSTRUCTOR & STARTUP
+// CONSTRUCTOR & DATA LOADING
 // ==========================================
 Warehouse::Warehouse() {
-    loadWorkers();   // Load Staff from file
-    loadInventory(); // Load Products
+    loadWorkers();   
+    loadInventory(); 
     
-    // Seed sample products if empty
+    // Safety check: Seed items if file was totally empty/missing
     if (inventory.empty()) {
-        cout << "[SYSTEM] Seeding initial inventory..." << endl;
+        cout << "[SYSTEM] Inventory empty. creating defaults...\n";
         addProduct(101, "Gaming Laptop", 10, 1200.00, 950.00, "Computers", "TechCorp");
         addProduct(102, "Wireless Mouse", 50, 45.00, 25.00, "Accessories", "TechCorp");
-        addProduct(103, "Mech Keyboard", 30, 85.00, 50.00, "Accessories", "TechCorp");
-        addProduct(201, "PS5 Console", 15, 499.00, 450.00, "Gaming", "SonyHub");
-        addProduct(202, "Elden Ring", 40, 59.99, 35.00, "Games", "FromSoft");
-        
-        while(!historyStack.isEmpty()) historyStack.pop();
-        saveInventory(); 
-        cout << "[SYSTEM] Initial inventory created." << endl;
+        saveInventory();
     }
 }
 
 // ==========================================
-// WORKER MANAGEMENT (NEW)
+// WORKER MANAGEMENT
 // ==========================================
-
 void Warehouse::loadWorkers() {
     ifstream file("workers.txt");
     if (!file) {
-        cout << "[SYSTEM] No workers.txt found. Creating default Admin." << endl;
-        // Default Admin if file missing
+        // Create default admin if file missing
         addNewWorker(999, "Super Admin", "Admin"); 
         return;
     }
 
     staffList.clear();
-    // Rebuild BST from scratch
     
     string line;
     while (getline(file, line)) {
@@ -53,141 +44,113 @@ void Warehouse::loadWorkers() {
         stringstream ss(line);
         string segment;
         vector<string> tokens;
-        
-        while(getline(ss, segment, '|')) {
-            tokens.push_back(segment);
-        }
+        while(getline(ss, segment, '|')) tokens.push_back(segment);
         
         if (tokens.size() >= 3) {
             int id = stoi(tokens[0]);
             string name = tokens[1];
             string role = tokens[2];
-            
             WorkerRecord w = {id, name, role};
             staffList.push_back(w);
             workerDB.root = workerDB.insertNode(workerDB.root, id);
         }
     }
     file.close();
-    cout << "[SYSTEM] Loaded " << staffList.size() << " workers from file." << endl;
 }
 
 void Warehouse::saveWorkers() {
     ofstream file("workers.txt");
-    if (!file) {
-        cout << "[ERROR] Could not save workers!" << endl;
-        return;
-    }
     for (const auto& w : staffList) {
         file << w.id << "|" << w.name << "|" << w.role << endl;
     }
     file.close();
-    cout << "[SYSTEM] Worker database updated." << endl;
 }
 
 bool Warehouse::validateLogin(int id, string &retName, string &retRole) {
-    // 1. Check BST for speed/existence
     if (!workerDB.searchNode(workerDB.root, id)) return false;
-    
-    // 2. Fetch Details from Vector
     for (const auto& w : staffList) {
-        if (w.id == id) {
-            retName = w.name;
-            retRole = w.role;
-            return true;
+        if (w.id == id) { 
+            retName = w.name; 
+            retRole = w.role; 
+            return true; 
         }
     }
     return false;
 }
 
 void Warehouse::addNewWorker(int id, string name, string role) {
-    // Check duplicates
-    if (workerDB.searchNode(workerDB.root, id)) {
-        cout << "[ERROR] Worker ID " << id << " already exists!" << endl;
-        return;
+    if (workerDB.searchNode(workerDB.root, id)) { 
+        cout << "[ERROR] Worker ID " << id << " already exists!\n"; 
+        return; 
     }
-    
     WorkerRecord w = {id, name, role};
     staffList.push_back(w);
     workerDB.root = workerDB.insertNode(workerDB.root, id);
-    saveWorkers(); // Auto-save
-    cout << "[SUCCESS] Added " << role << ": " << name << " (ID: " << id << ")" << endl;
+    saveWorkers();
+    cout << "[SUCCESS] Added " << role << ": " << name << endl;
 }
 
 void Warehouse::removeWorker(int id) {
     bool found = false;
     for (size_t i = 0; i < staffList.size(); i++) {
         if (staffList[i].id == id) {
-            // Cannot delete yourself
-            if (staffList[i].id == operatorID) {
-                cout << "[ERROR] You cannot delete your own account while logged in!" << endl;
-                return;
+            if (staffList[i].id == operatorID) { 
+                cout << "[ERROR] You cannot delete yourself!\n"; 
+                return; 
             }
-            
-            cout << "[SUCCESS] Removed " << staffList[i].name << endl;
             staffList.erase(staffList.begin() + i);
             found = true;
             break;
         }
     }
-    
     if (found) {
-        // Re-save file
         saveWorkers();
         workerDB.root = workerDB.deleteNode(workerDB.root, id);
+        cout << "[SUCCESS] Worker removed.\n";
     } else {
-        cout << "[ERROR] Worker ID not found." << endl;
+        cout << "[ERROR] ID not found.\n";
     }
+}
+
+string Warehouse::getWorkerRole(int id) {
+    for(const auto& w : staffList) {
+        if(w.id == id) return w.role;
+    }
+    return "Unknown";
 }
 
 // ==========================================
 // SHIFT MANAGEMENT
 // ==========================================
-
 void Warehouse::startShift(string shiftName, string opName, int opID, string role) {
     currentShiftName = shiftName;
     operatorName = opName;
     operatorID = opID; 
-    operatorRole = role; // [NEW]
+    operatorRole = role;
     
-    sessionRevenue = 0.0;
-    sessionProfit = 0.0;
+    sessionRevenue = 0.0; 
+    sessionProfit = 0.0; 
     sessionItemsSold = 0;
     sessionSalesLog.clear(); 
     
-    cout << "\n[SYSTEM] Shift Started: " << shiftName 
-         << " | Operator: " << opName << " (" << role << ")" << endl;
+    cout << "\n[SYSTEM] Shift Started: " << shiftName << " | Operator: " << opName << endl;
 }
 
-void Warehouse::endShift() {
-    cout << "\n==================================================" << endl;
-    cout << "             END OF SHIFT REPORT                  " << endl;
-    cout << "==================================================" << endl;
-    cout << " Shift:    " << currentShiftName << endl;
-    cout << " Operator: " << operatorName << " (ID: " << operatorID << ")" << endl; 
-    cout << " Role:     " << operatorRole << endl;
-    cout << " --------------------------------------------------" << endl;
-    cout << " Items Sold:      " << sessionItemsSold << endl;
-    cout << " Session Revenue: $" << fixed << setprecision(2) << sessionRevenue << endl;
-    cout << " Session Profit:  $" << fixed << setprecision(2) << sessionProfit << endl;
-    cout << " --------------------------------------------------" << endl;
-    cout << " DETAILED LOG:" << endl;
-    if (sessionSalesLog.empty()) {
-        cout << " (No sales this session)" << endl;
-    } else {
-        for (const auto& log : sessionSalesLog) {
-            cout << " - " << log << endl;
-        }
-    }
-    cout << " --------------------------------------------------" << endl;
-    cout << " [SYSTEM] Logging out..." << endl;
-    cout << "==================================================\n" << endl;
+// In warehouse.cpp
 
-    // --- Persistent History Save ---
+void Warehouse::endShift() {
+    cout << "\n=== END OF SHIFT REPORT ===\n";
+    cout << "Items Sold: " << sessionItemsSold << endl;
+    cout << "Session Revenue: $" << fixed << setprecision(2) << sessionRevenue << endl;
+    cout << "Session Profit:  $" << fixed << setprecision(2) << sessionProfit << endl;
+    
+    // [NEW] Automatically generate the text file report
+    exportToFile(); 
+    
+    // Append to History File (Log book)
     ofstream historyFile("sales_history.txt", ios::app);
     if (historyFile) {
-        historyFile << "=== SHIFT: " << currentShiftName 
-                    << " | OP: " << operatorName << " (ID:" << operatorID << ") ===\n";
+        historyFile << "=== SHIFT: " << currentShiftName << " | OP: " << operatorName << " ===\n";
         historyFile << "Revenue: $" << fixed << setprecision(2) << sessionRevenue 
                     << " | Profit: $" << sessionProfit << "\n";
         for (const auto& log : sessionSalesLog) historyFile << " - " << log << "\n";
@@ -195,75 +158,52 @@ void Warehouse::endShift() {
         historyFile.close();
     }
 }
-
 // ==========================================
-// INVENTORY MANAGEMENT
+// INVENTORY ACTIONS
 // ==========================================
 void Warehouse::addProduct(int id, string name, int quantity, double price, double cost, string category, string supplier) {
-    if (idIndex.searchNode(idIndex.root, id)) {
-        cout << "[ERROR] Product ID " << id << " already exists!" << endl;
-        return;
+    if (idIndex.searchNode(idIndex.root, id)) { 
+        cout << "[ERROR] Product ID Taken!\n"; 
+        return; 
     }
-
     Product newProd(id, name, quantity, price, cost, category, supplier);
     inventory.push_back(newProd);
     
     idIndex.root = idIndex.insertNode(idIndex.root, id);
     layout.append(id);
     
-    Product dummy;
-    Action act = {ADD_PRODUCT, id, quantity, dummy};
+    Product dummy; 
+    Action act = {ADD_PRODUCT, id, quantity, dummy}; 
     historyStack.push(act);
-    
+
     bubbleSort(inventory); 
-    cout << "[OK] Product Added: " << name << endl;
+    saveInventory();
+    cout << "[OK] Product Added: " << name << "\n";
 }
 
 int Warehouse::findProductIndex(int id) {
     return binarySearchRec(inventory, 0, inventory.size() - 1, id);
 }
 
-bool Warehouse::searchUsingTree(int id) {
-    return idIndex.searchNode(idIndex.root, id);
+bool Warehouse::searchUsingTree(int id) { 
+    return idIndex.searchNode(idIndex.root, id); 
 }
 
 void Warehouse::listInventory() {
-    cout << "\n================================ WAREHOUSE INVENTORY ================================" << endl;
-    if (inventory.empty()) {
-        cout << "                                  (Warehouse is empty)                                  " << endl;
-        cout << "=====================================================================================" << endl;
-        return;
-    }
-    
-    cout << left << setw(6)  << "ID" 
-         << left << setw(20) << "Name" 
-         << left << setw(10) << "Qty" 
-         << left << setw(12) << "Price($)" 
-         << left << setw(12) << "Cost($)" 
-         << left << setw(15) << "Category" 
-         << left << setw(15) << "Supplier" << endl;
-         
-    cout << string(90, '-') << endl;
-
+    cout << "\n=== INVENTORY ===\n";
+    cout << left << setw(6) << "ID" << setw(20) << "Name" << setw(6) << "Qty" << setw(10) << "Price" << endl;
+    cout << "------------------------------------------" << endl;
     for (const Product &p : inventory) {
-        cout << left << setw(6)  << p.getId() 
-             << left << setw(20) << p.getName() 
-             << left << setw(10) << p.getQuantity() 
-             << left << setw(12) << fixed << setprecision(2) << p.getPrice()
-             << left << setw(12) << fixed << setprecision(2) << p.getCost()
-             << left << setw(15) << p.getCategory() 
-             << left << setw(15) << p.getSupplier() << endl;
+        cout << left << setw(6) << p.getId() << setw(20) << p.getName() 
+             << setw(6) << p.getQuantity() << setw(10) << p.getPrice() << endl;
     }
-    cout << "=====================================================================================\n" << endl;
+    cout << endl;
 }
 
 void Warehouse::removeProduct(int id) {
     int index = findProductIndex(id);
-    if (index == -1) {
-        cout << "[ERROR] Product not found!" << endl;
-        return;
-    }
-
+    if (index == -1) { cout << "Not found.\n"; return; }
+    
     Product p = inventory[index];
     inventory.erase(inventory.begin() + index);
     idIndex.root = idIndex.deleteNode(idIndex.root, id);
@@ -271,140 +211,111 @@ void Warehouse::removeProduct(int id) {
     
     Action act = {DELETE_PRODUCT, id, 0, p}; 
     historyStack.push(act);
-    cout << "[OK] Product " << id << " deleted successfully." << endl;
+    
+    saveInventory();
+    cout << "[OK] Deleted.\n";
 }
 
 void Warehouse::manualRestock(int id, int qty) {
     int index = findProductIndex(id);
-    if (index == -1) {
-        cout << "[ERROR] Product not found!" << endl;
-        return;
-    }
-    inventory[index].restock(qty);
-    cout << "[OK] Restocked " << qty << " units." << endl;
-    
-    Product dummy;
-    Action act = {RESTOCK_PRODUCT, id, qty, dummy};
-    historyStack.push(act);
-}
-
-// ==========================================
-// UNDO & HISTORY
-// ==========================================
-
-void Warehouse::undoLastAction() {
-    if (historyStack.isEmpty()) {
-        cout << "[INFO] Nothing to undo." << endl;
-        return;
-    }
-
-    Action last = historyStack.pop();
-    int idx = findProductIndex(last.productID);
-
-    switch (last.type) {
-        case ADD_PRODUCT:
-            cout << "Undoing ADD of ID " << last.productID << "..." << endl;
-            {
-                int rIdx = findProductIndex(last.productID);
-                if(rIdx != -1) inventory.erase(inventory.begin() + rIdx);
-                idIndex.root = idIndex.deleteNode(idIndex.root, last.productID);
-                layout.removeNode(last.productID);
-            }
-            break;
-
-        case SELL_PRODUCT:
-            if (idx != -1) {
-                inventory[idx].restock(last.quantity);
-                double price = inventory[idx].getPrice();
-                double cost = inventory[idx].getCost();
-                double subtotal = price * last.quantity;
-                double tax = subtotal * 0.14;
-                double profit = (price - cost) * last.quantity;
-                
-                revenue -= (subtotal + tax);
-                taxCollected -= tax;
-                netProfit -= profit;
-                cout << "Undoing SALE. Stock restored & Finances adjusted." << endl;
-            }
-            break;
-            
-        case RESTOCK_PRODUCT:
-             if (idx != -1) {
-                inventory[idx].sell(last.quantity); 
-                cout << "Undoing RESTOCK. Stock reduced." << endl;
-            }
-            break;
-
-        case DELETE_PRODUCT:
-            cout << "Undoing DELETE. Restoring " << last.backupData.getName() << "..." << endl;
-            inventory.push_back(last.backupData);
-            bubbleSort(inventory);
-            idIndex.root = idIndex.insertNode(idIndex.root, last.productID);
-            layout.append(last.productID);
-            break;
+    if (index != -1) {
+        inventory[index].restock(qty);
+        
+        Product dummy;
+        Action act = {RESTOCK_PRODUCT, id, qty, dummy};
+        historyStack.push(act);
+        
+        saveInventory();
+        cout << "[OK] Restocked.\n";
+    } else {
+        cout << "[ERROR] Product not found.\n";
     }
 }
 
-void Warehouse::debugHistory() {
-    cout << "\n[DEBUG] Requesting Stack Dump..." << endl;
-    historyStack.printStack(); 
+void Warehouse::peekProduct(int id) {
+    int idx = findProductIndex(id);
+    if(idx != -1) {
+        cout << "Found: " << inventory[idx].getName() 
+             << " | Price: $" << inventory[idx].getPrice() << endl;
+    }
+}string Warehouse::getProductName(int id) {
+    int idx = findProductIndex(id);
+    if (idx != -1) return inventory[idx].getName();
+    return "Unknown";
+}
+
+double Warehouse::getProductPrice(int id) {
+    int idx = findProductIndex(id);
+    if (idx != -1) return inventory[idx].getPrice();
+    return 0.0;
 }
 
 // ==========================================
-// ORDER QUEUES
+// ORDER PROCESSING (VIP & SELECTIVE)
 // ==========================================
 
 void Warehouse::addToOrderQueue(int id, int qty, string payment, string name, string phone) {
-    if (!searchUsingTree(id)) { 
-        cout << "[ERROR] Product not found." << endl;
-        return;
-    }
     Order newOrder = {id, qty, payment, name, phone, nullptr};
     orderQueue.enqueue(newOrder);
 }
 
 void Warehouse::addVIPOrder(int id, int qty, string payment, string name, string phone) {
-    if (!searchUsingTree(id)) { 
-        cout << "[ERROR] Product not found." << endl;
-        return;
-    }
     Order newOrder = {id, qty, payment, name, phone, nullptr};
     vipQueue.enqueue(newOrder);
 }
 
-void Warehouse::viewPendingOrders() {
-    cout << "\n   [Current Cart Status]" << endl;
-    cout << "   Normal: ";
-    orderQueue.display(); 
-    cout << endl;
-    cout << "   VIP:    ";
-    vipQueue.display();   
-    cout << "\n   ---------------------" << endl;
-}
-
 void Warehouse::processOrders() {
-    cout << "\n--- Processing Orders ---" << endl;
-    if (vipQueue.isEmpty() && orderQueue.isEmpty()) {
-        cout << "No orders to process." << endl;
-        return;
-    }
+    cout << "\n==========================================" << endl;
+    cout << "         PENDING ORDER QUEUES            " << endl;
+    cout << "==========================================" << endl;
+    cout << " [1] VIP Queue    (Pending: "; vipQueue.display(); cout << ")" << endl;
+    cout << " [2] Normal Queue (Pending: "; orderQueue.display(); cout << ")" << endl;
+    cout << " [3] Process EVERYTHING (Auto)" << endl;
+    cout << " [0] Cancel / Go Back" << endl;
+    cout << "------------------------------------------" << endl;
+    cout << "Decision: ";
+    
+    int choice;
+    cin >> choice;
 
-    auto handleOrder = [&](Queue& q, string type) {
+    if (choice == 0) return;
+
+    // Helper Lambda to process a specific queue
+    auto processQueue = [&](Queue& q, string type) {
+        if (q.isEmpty()) {
+            cout << "[INFO] " << type << " queue is empty.\n";
+            return;
+        }
+        
+        cout << "\n--- Processing " << type << " Orders ---" << endl;
         while (!q.isEmpty()) {
             Order ord = q.dequeue();
             int index = findProductIndex(ord.id);
             
             if (index != -1) {
                 if (inventory[index].getQuantity() >= ord.qty) {
+                    
+                    // 1. Update Stock
                     inventory[index].sell(ord.qty); 
                     
+                    // 2. Financials Math
                     double price = inventory[index].getPrice();
                     double cost = inventory[index].getCost();
-                    double subtotal = price * ord.qty;      
+                    double subtotal = price * ord.qty; 
+                    
+                    // [VIP LOGIC] +10% Surcharge
+                    if (type == "VIP") {
+                        subtotal = subtotal * 1.10; 
+                    }
+
                     double tax = subtotal * 0.14;           
                     double total = subtotal + tax;          
                     double profit = (price - cost) * ord.qty; 
                     
+                    // Add VIP surcharge purely to profit
+                    if (type == "VIP") profit += (subtotal - (price * ord.qty)); 
+                    
+                    // 3. Update Global Totals
                     revenue += total;
                     taxCollected += tax;
                     netProfit += profit;
@@ -413,318 +324,200 @@ void Warehouse::processOrders() {
                     sessionProfit += profit;
                     sessionItemsSold += ord.qty;
 
-                    cout << "[" << type << "] Sold: " << inventory[index].getName() 
-                         << " x" << ord.qty 
-                         << " to " << ord.customerName
-                         << " | Total: $" << total << endl;
+                    // Display Receipt Info
+                    cout << "Processing: " << inventory[index].getName() << " x" << ord.qty << endl;
+                    if (type == "VIP") cout << " -> VIP Surcharge Applied (+10%)" << endl;
+                    cout << " -> Total Receipt: $" << fixed << setprecision(2) << total << endl;
 
+                    // Log Logic
+                    stringstream ss; ss << fixed << setprecision(2) << total;
+                    string logEntry = "[" + type + "] " + inventory[index].getName() + 
+                                      " (ID:" + to_string(ord.id) + ")" +
+                                      " | Total: $" + ss.str();
+                    salesLog.push_back(logEntry); // Lifetime log
+                    sessionSalesLog.push_back(logEntry); // Session log
+                    
+                    // Add to Undo Stack
                     Product dummy;
                     Action act = {SELL_PRODUCT, ord.id, ord.qty, dummy};
                     historyStack.push(act);
 
-                    stringstream ss;
-                    ss << fixed << setprecision(2) << total;
-                    string formattedTotal = ss.str();
-
-                    string logEntry = "[" + type + "] " + inventory[index].getName() + 
-                                      " (ID:" + to_string(ord.id) + ")" +
-                                      " | Customer: " + ord.customerName + " (" + ord.customerPhone + ")" +
-                                      " | Pay: " + ord.paymentMethod +
-                                      " | Total: $" + formattedTotal;
-                    salesLog.push_back(logEntry);
-                    sessionSalesLog.push_back(logEntry);
-
                 } else {
-                    cout << "[ERROR] Not enough stock for " << inventory[index].getName() << endl;
+                    cout << "[ERROR] Out of stock: " << inventory[index].getName() << endl;
                 }
+            } else {
+                cout << "[ERROR] Product ID " << ord.id << " no longer exists.\n";
             }
         }
     };
 
-    handleOrder(vipQueue, "VIP");
-    handleOrder(orderQueue, "Normal");
+    // Execute based on selection
+    if (choice == 1 || choice == 3) processQueue(vipQueue, "VIP");
+    if (choice == 2 || choice == 3) processQueue(orderQueue, "Normal");
 
-    smartReorder();
-    saveInventory(); 
-    cout << "[OK] Orders processed.\n" << endl;
+    saveInventory(); // Immediate Save ensures files are never empty
+    cout << "\n[SYSTEM] Processing Complete. Files Updated.\n" << endl;
+}
+
+void Warehouse::viewPendingOrders() {
+    cout << "Normal: "; orderQueue.display(); cout << endl;
+    cout << "VIP:    "; vipQueue.display(); cout << endl;
 }
 
 void Warehouse::smartReorder() {
-    for (auto &p : inventory) {
-        if (p.getQuantity() < 3) {
-            cout << "[!] Auto Restock -> " << p.getName() << " +5 units\n";
-            p.restock(5);
-        }
-    }
-}
-
-void Warehouse::showStorageLayout() {
-    cout << "\n[STORAGE] Layout: ";
-    layout.printList();
-    cout << endl;
+    // Optional auto-reorder logic stub
 }
 
 // ==========================================
-// REPORTS & FILES
+// RETURNS
 // ==========================================
-void Warehouse::saveInventory() {
-    ofstream file("inventory.txt");
-    if (!file) {
-        cout << "[ERROR] Could not save inventory!" << endl;
-        return;
-    }
-    file << "Total Products: " << inventory.size() << endl;
-    file << "ID|Name|Qty|Price|Cost|Category|Supplier" << endl; 
-    for (const auto& p : inventory) {
-        file << p.getId() << "|" 
-             << p.getName() << "|" 
-             << p.getQuantity() << "|" 
-             << p.getPrice() << "|" 
-             << p.getCost() << "|" 
-             << p.getCategory() << "|" 
-             << p.getSupplier() << endl;
-    }
-    
-    ofstream finFile("financials.txt");
-    if (finFile) {
-        double costOfGoods = revenue - taxCollected - netProfit;
-        finFile << "================ FINANCIAL STATEMENT ================" << endl;
-        finFile << "Total Revenue (Gross): $" << fixed << setprecision(2) << revenue << endl;
-        finFile << "(-) Tax Collected:     $" << fixed << setprecision(2) << taxCollected << endl;
-        finFile << "(-) Cost of Goods:     $" << fixed << setprecision(2) << costOfGoods << endl;
-        finFile << "-----------------------------------------------------" << endl;
-        finFile << "(=) Net Profit:        $" << fixed << setprecision(2) << netProfit << endl;
-        finFile << "=====================================================" << endl;
-        finFile.close();
-    }
-    file.close();
-    cout << "[SYSTEM] data saved." << endl;
-}
-
-void Warehouse::loadInventory() {
-    ifstream file("inventory.txt");
-    if (!file) {
-        cout << "[SYSTEM] No save file found. Starting fresh." << endl;
-        return;
-    }
-    
-    inventory.clear();
-    string line;
-    while (getline(file, line)) {
-        if (line.empty()) continue;
-        if (line.find("Total Products:") != string::npos) continue;
-        if (line.find("ID|") != string::npos) continue;
-        if (isdigit(line[0]) && line.find('|') == string::npos) continue;
-
-        size_t pos = 0;
-        vector<string> tokens;
-        while ((pos = line.find('|')) != string::npos) {
-            tokens.push_back(line.substr(0, pos));
-            line.erase(0, pos + 1);
-        }
-        tokens.push_back(line); 
-
-        if (tokens.size() >= 7) {
-            int id = stoi(tokens[0]);
-            string name = tokens[1];
-            int qty = stoi(tokens[2]);
-            double price = stod(tokens[3]);
-            double cost = stod(tokens[4]); 
-            string cat = tokens[5];
-            string supp = tokens[6];
-            addProduct(id, name, qty, price, cost, cat, supp);
-        } else if (tokens.size() == 6) {
-            int id = stoi(tokens[0]);
-            string name = tokens[1];
-            int qty = stoi(tokens[2]);
-            double price = stod(tokens[3]);
-            double cost = price * 0.7; 
-            string cat = tokens[4];
-            string supp = tokens[5];
-            addProduct(id, name, qty, price, cost, cat, supp);
-        }
-    }
-    
-    while(!historyStack.isEmpty()) historyStack.pop();
-
-    ifstream finFile("financials.txt");
-    if (finFile) {
-        string finLine;
-        while (getline(finFile, finLine)) {
-            size_t colonPos = finLine.find(':');
-            if (colonPos != string::npos) {
-                string valStr = finLine.substr(colonPos + 1);
-                size_t numStart = valStr.find_first_of("0123456789.-");
-                if (numStart != string::npos) {
-                    double val = stod(valStr.substr(numStart));
-                    if (finLine.find("Total Revenue") != string::npos) revenue = val;
-                    else if (finLine.find("Tax Collected") != string::npos) taxCollected = val;
-                    else if (finLine.find("Net Profit") != string::npos) netProfit = val;
-                }
-            }
-        }
-        finFile.close();
-    }
-    file.close();
-    cout << "[SYSTEM] Data loaded successfully (" << inventory.size() << " items)." << endl;
-}
-
-void Warehouse::exportToFile() {
-    ofstream file("warehouse_report.txt");
-    if (!file) {
-        cout << "[ERROR] Could not create report file.\n";
-        return;
-    }
-
-    file << "====================================================================================================\n";
-    file << "                                      ELECTRONICS STORE - MANAGEMENT REPORT                        \n";
-    file << "====================================================================================================\n";
-    file << " Shift: " << left << setw(20) << currentShiftName 
-         << " Operator: " << operatorName << " (ID: " << operatorID << ")\n";
-    file << " Generated: 2026-01-03\n";
-    file << "====================================================================================================\n\n";
-    
-    file << "[CURRENT INVENTORY SNAPSHOT]\n";
-    file << left << setw(6)  << "ID" 
-         << left << setw(20) << "Name" 
-         << left << setw(10) << "Qty" 
-         << left << setw(12) << "Price($)" 
-         << left << setw(12) << "Cost($)" 
-         << left << setw(15) << "Category" 
-         << left << setw(15) << "Supplier" << endl;
-    file << string(95, '-') << endl;
-
-    double totalStockValue = 0.0;
-    for(const auto &p : inventory) {
-        file << left << setw(6)  << p.getId() 
-             << left << setw(20) << p.getName() 
-             << left << setw(10) << p.getQuantity() 
-             << left << setw(12) << fixed << setprecision(2) << p.getPrice()
-             << left << setw(12) << fixed << setprecision(2) << p.getCost()
-             << left << setw(15) << p.getCategory() 
-             << left << setw(15) << p.getSupplier() << endl;
-        totalStockValue += (p.getQuantity() * p.getCost());
-    }
-
-    file << "\n[FINANCIAL PERFORMANCE - LIFETIME]\n";
-    double costOfGoods = revenue - taxCollected - netProfit;
-    double margin = (revenue > 0) ? (netProfit / revenue) * 100.0 : 0.0;
-    file << "--------------------------------------------------\n";
-    file << " Total Cash In (Revenue): $" << fixed << setprecision(2) << revenue << "\n";
-    file << " (-) Total Tax Collected: $" << taxCollected << "\n";
-    file << " (-) Cost of Goods Sold:  $" << costOfGoods << "\n";
-    file << " --------------------------------------------------\n";
-    file << " NET PROFIT:              $" << netProfit << " (" << margin << "% Margin)\n";
-    file << " Inventory Valuation:     $" << totalStockValue << " (at Cost)\n";
-    file << "--------------------------------------------------\n\n";
-
-    file << "[SHIFT SALES LOG - " << currentShiftName << "]\n";
-    file << "--------------------------------------------------\n";
-    if (sessionSalesLog.empty()) {
-        file << " (No sales recorded this session)\n";
-    } else {
-        for (const auto& log : sessionSalesLog) {
-            file << " " << log << "\n";
-        }
-    }
-    file << "--------------------------------------------------\n\n";
-    file << "=============================== [ END OF REPORT ] ===============================\n";
-    file.close();
-    cout << "[FILE] Report exported to 'warehouse_report.txt'.\n";
-}
-
-void Warehouse::showRevenue() {
-    double costOfGoods = revenue - taxCollected - netProfit;
-    double margin = (revenue > 0) ? (netProfit / revenue) * 100.0 : 0.0;
-    cout << "\n================ FINANCIAL DASHBOARD ================" << endl;
-    cout << " [LIFETIME TOTALS]" << endl;
-    cout << "  Gross Revenue:    $" << fixed << setprecision(2) << revenue << endl;
-    cout << "  (-) Tax (14%):    $" << taxCollected << endl;
-    cout << "  (-) Cost of Sales: $" << costOfGoods << endl;
-    cout << "  ------------------------------------" << endl;
-    cout << "  NET PROFIT:       $" << netProfit << endl;
-    cout << "  Profit Margin:    " << margin << "%" << endl;
-    cout << "\n [CURRENT SHIFT: " << currentShiftName << "]" << endl;
-    cout << "  Items Sold:       " << sessionItemsSold << endl;
-    cout << "  Session Revenue:  $" << sessionRevenue << endl;
-    cout << "  Session Profit:   $" << sessionProfit << endl;
-    cout << "====================================================" << endl;
-}
-
-void Warehouse::sortByID() {
-    bubbleSort(inventory); 
-    cout << "[OK] Inventory sorted by ID.\n";
-}
-
-void Warehouse::sortByPrice() {
-    for (size_t i = 0; i < inventory.size() - 1; i++)
-        for (size_t j = 0; j < inventory.size() - i - 1; j++)
-            if (inventory[j].getPrice() > inventory[j+1].getPrice())
-                swap(inventory[j], inventory[j+1]);
-    cout << "[OK] Inventory sorted by Price.\n";
-}
-
-void Warehouse::peekProduct(int id) {
-    int index = findProductIndex(id);
-    if (index != -1) {
-        cout << "   [SCANNER] Found: " << inventory[index].getName() 
-             << " | Unit Price: $" << inventory[index].getPrice() << endl;
-    }
-}
-
-// ==========================================
-// RETURNS & OVERRIDES (NEW)
-// ==========================================
-
-// Helper: Checks what role an ID belongs to (for Manager Override)
-string Warehouse::getWorkerRole(int id) {
-    // Check our loaded staff list
-    for (const auto& w : staffList) {
-        if (w.id == id) {
-            return w.role;
-        }
-    }
-    return "Unknown";
-}
-
 void Warehouse::returnProduct(int id, int qty) {
     int index = findProductIndex(id);
     if (index == -1) {
-        cout << "[ERROR] Product not found in database. Cannot return." << endl;
+        cout << "[ERROR] Product not found.\n";
         return;
     }
-
-    // 1. Restore Stock (Add items back to shelf)
+    
+    // 1. Restore Stock
     inventory[index].restock(qty);
-
-    // 2. Calculate Refund Amounts
+    
+    // 2. Reverse Money
     double price = inventory[index].getPrice();
     double cost = inventory[index].getCost();
     
     double subtotal = price * qty;
     double tax = subtotal * 0.14;
-    double totalRefund = subtotal + tax;    // This is what we pay back to customer
-    double profitReversal = (price - cost) * qty; // We lose the profit we made
+    double totalRefund = subtotal + tax; 
+    double profitReversal = (price - cost) * qty;
 
-    // 3. Subtract from Financials
     revenue -= totalRefund;
     taxCollected -= tax;
     netProfit -= profitReversal;
 
-    // 4. Update Session Stats (So the shift report is accurate)
     sessionRevenue -= totalRefund;
     sessionProfit -= profitReversal;
     sessionItemsSold -= qty;
 
-    cout << "\n[SUCCESS] Refund Processed." << endl;
-    cout << " - Stock Restored: +" << qty << endl;
-    cout << " - Revenue Deducted: -$" << fixed << setprecision(2) << totalRefund << endl;
-    cout << " - Tax Adjusted: -$" << tax << endl;
-
-    // 5. Log it
-    string logEntry = "[RETURN] ID:" + to_string(id) + " | Qty:" + to_string(qty) + " | Refunded: $" + to_string(totalRefund);
+    string logEntry = "[RETURN] ID:" + to_string(id) + " | Qty:" + to_string(qty) + " | Refund: $" + to_string(totalRefund);
     sessionSalesLog.push_back(logEntry);
+
+    saveInventory();
+    cout << "[SUCCESS] Refund Processed & Stock Restored.\n";
+}
+
+// ==========================================
+// FILES & REPORTS
+// ==========================================
+void Warehouse::saveInventory() {
+    // 1. Inventory File
+    ofstream file("inventory.txt");
+    file << "Total Products: " << inventory.size() << endl;
+    file << "ID|Name|Qty|Price|Cost|Category|Supplier" << endl; 
+    for (const auto& p : inventory) {
+        file << p.getId() << "|" << p.getName() << "|" << p.getQuantity() << "|" 
+             << p.getPrice() << "|" << p.getCost() << "|" << p.getCategory() << "|" << p.getSupplier() << endl;
+    }
+    file.close();
     
-    // 6. Save immediately
-    saveInventory(); 
+    // 2. Financials File
+    ofstream finFile("financials.txt"); 
+    finFile << "Total Revenue: " << revenue << endl;
+    finFile << "Tax Collected: " << taxCollected << endl;
+    finFile << "Net Profit: " << netProfit << endl;
+    finFile.close();
+}
+
+void Warehouse::loadInventory() {
+    ifstream file("inventory.txt");
+    if (!file) return; 
+    
+    inventory.clear();
+    string line;
+    while (getline(file, line)) {
+        if (isdigit(line[0]) && line.find('|') != string::npos) {
+            stringstream ss(line);
+            string seg; vector<string> t;
+            while(getline(ss, seg, '|')) t.push_back(seg);
+            
+            // Handle optional fields logic
+            if (t.size() >= 7) {
+                 addProduct(stoi(t[0]), t[1], stoi(t[2]), stod(t[3]), stod(t[4]), t[5], t[6]);
+            } else if (t.size() >= 5) {
+                 // Fallback for older file formats
+                 addProduct(stoi(t[0]), t[1], stoi(t[2]), stod(t[3]), stod(t[4]), "General", "Generic");
+            }
+        }
+    }
+    file.close();
+
+    // Load Financials
+    ifstream finFile("financials.txt");
+    if (finFile) {
+        string tag; double val;
+        // Simple parsing: looks for numbers after labels
+        while (finFile >> tag >> tag >> val) { 
+            if (tag == "Revenue:") revenue = val;
+            if (tag == "Collected:") taxCollected = val;
+            if (tag == "Profit:") netProfit = val;
+        }
+        finFile.close();
+    }
+}
+
+void Warehouse::exportToFile() {
+    ofstream file("warehouse_report.txt");
+    file << "=======================================\n";
+    file << "       SHIFT REPORT: " << currentShiftName << "\n";
+    file << "=======================================\n";
+    file << "Operator: " << operatorName << " (ID: " << operatorID << ")\n";
+    file << "Revenue:  $" << revenue << "\nProfit:   $" << netProfit << "\n";
+    file << "\n--- Inventory Snapshot ---\n";
+    for(const auto &p : inventory) {
+        file << p.getName() << " (ID:" << p.getId() << ") Qty: " << p.getQuantity() << "\n";
+    }
+    file.close();
+    cout << "[FILE] Report Exported to warehouse_report.txt\n";
+}
+
+void Warehouse::showRevenue() {
+    cout << "\n=== FINANCIAL DASHBOARD ===\n";
+    cout << "Total Revenue: $" << revenue << endl;
+    cout << "Total Profit:  $" << netProfit << endl;
+    cout << "Shift Revenue: $" << sessionRevenue << endl;
+}
+
+// ==========================================
+// HELPERS & UNDO
+// ==========================================
+void Warehouse::showStorageLayout() { layout.printList(); cout << endl; }
+void Warehouse::sortByID() { bubbleSort(inventory); cout << "Sorted by ID.\n"; }
+void Warehouse::sortByPrice() { 
+    for (size_t i = 0; i < inventory.size() - 1; i++)
+        for (size_t j = 0; j < inventory.size() - i - 1; j++)
+            if (inventory[j].getPrice() > inventory[j+1].getPrice()) swap(inventory[j], inventory[j+1]);
+    cout << "Sorted by Price.\n";
+}
+
+void Warehouse::undoLastAction() {
+    if (historyStack.isEmpty()) { cout << "Nothing to undo.\n"; return; }
+    Action last = historyStack.pop();
+    
+    // Simple undo logic
+    if (last.type == ADD_PRODUCT) {
+        removeProduct(last.productID);
+        cout << "Undid Add Product.\n";
+    } else if (last.type == RESTOCK_PRODUCT) {
+         int idx = findProductIndex(last.productID);
+         if(idx!=-1) inventory[idx].sell(last.quantity);
+         cout << "Undid Restock.\n";
+    } else if (last.type == SELL_PRODUCT) {
+         int idx = findProductIndex(last.productID);
+         if(idx!=-1) inventory[idx].restock(last.quantity);
+         cout << "Undid Sale (Stock restored).\n";
+    }
+    saveInventory();
+}
+
+void Warehouse::debugHistory() {
+    historyStack.printStack();
 }
