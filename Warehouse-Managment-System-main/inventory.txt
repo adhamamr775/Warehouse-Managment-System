@@ -1,0 +1,8 @@
+Total Products: 6
+ID|Name|Qty|Price|Cost|Category|Supplier
+101|Gaming Laptop|9|1200|950|Computers|TechCorp
+102|Wireless Mouse|50|45|25|Accessories|TechCorp
+103|Mech Keyboard|30|85|50|Accessories|TechCorp
+105|RTX 5090 Gold Edition|10|700|600|Accessories|Nvidia
+201|PS5 Console|15|499|450|Gaming|SonyHub
+202|Elden Ring|40|59.99|35|Games|FromSoft

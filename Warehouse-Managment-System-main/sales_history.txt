@@ -1,0 +1,22 @@
+=== SHIFT: FinalPolish | OP: QA ===
+Revenue: $1368.00 | Profit: $250.00
+ - [VIP] Gaming Laptop (ID:101) | Customer: VIP (123) | Pay: Visa | Total: $1368.00
+--------------------------------------------------
+=== SHIFT: night | OP: adham ===
+Revenue: $0.00 | Profit: $0.00
+--------------------------------------------------
+=== SHIFT: night | OP: adham ===
+Revenue: $0.00 | Profit: $0.00
+--------------------------------------------------
+=== SHIFT: night | OP: aaa ===
+Revenue: $0.00 | Profit: $0.00
+--------------------------------------------------
+=== SHIFT: Day | OP: James ===
+Revenue: $0.00 | Profit: $0.00
+--------------------------------------------------
+=== SHIFT: Night | OP: Adham ===
+Revenue: $0.00 | Profit: $0.00
+--------------------------------------------------
+=== SHIFT: Night | OP: Adham ===
+Revenue: $0.00 | Profit: $0.00
+--------------------------------------------------
