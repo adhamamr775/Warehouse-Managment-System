@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <fstream> // Required for file handling
 #include "product.h" 
 
 // Data Structures & Algorithms
@@ -15,6 +16,13 @@
 
 using namespace std;
 
+// [NEW] Struct to hold worker details
+struct WorkerRecord {
+    int id;
+    string name;
+    string role; // "Admin", "Manager", "Worker"
+};
+
 class Warehouse {
 private:
     vector<Product> inventory;
@@ -24,8 +32,9 @@ private:
     Queue vipQueue;
     Stack historyStack;
     
-    // [NEW] Security Database
-    BST workerDB; 
+    // [NEW] Worker Management
+    BST workerDB; // Still used for fast ID validation
+    vector<WorkerRecord> staffList; // Stores full details (Role/Name)
     
     double revenue = 0.0;     
     double netProfit = 0.0;   
@@ -35,7 +44,8 @@ private:
     // Shift / Session Data
     string currentShiftName;
     string operatorName;
-    int operatorID = 0;       // [NEW] Store Operator ID
+    int operatorID = 0;       
+    string operatorRole; // [NEW] Track current user's role
     
     double sessionRevenue = 0.0;
     double sessionProfit = 0.0;
@@ -45,10 +55,15 @@ private:
 public:
     Warehouse();
     
-    // Security & Shift Management
-    void loadWorkers();             // [NEW] Load valid IDs
-    bool validateLogin(int id);     // [NEW] Check ID
-    void startShift(string shiftName, string opName, int opID); 
+    // [NEW] Worker Management
+    void loadWorkers();             // Load from workers.txt
+    void saveWorkers();             // Save to workers.txt
+    bool validateLogin(int id, string &retName, string &retRole); // Modified to return info
+    void addNewWorker(int id, string name, string role);
+    void removeWorker(int id);
+    string getCurrentRole() { return operatorRole; } // Getter for Main.cpp
+
+    void startShift(string shiftName, string opName, int opID, string role); // Updated
     void endShift();
 
     // Inventory
@@ -81,6 +96,9 @@ public:
     void sortByID();
     void sortByPrice();
     void peekProduct(int id);
+    // [NEW] Returns & Manager Override
+    string getWorkerRole(int id);        // Helper to check ID role without full login
+    void returnProduct(int id, int qty); // Handles the refund math
 };
 
 #endif
