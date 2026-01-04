@@ -1,8 +1,17 @@
-Total Products: 6
+Total Products: 15
 ID|Name|Qty|Price|Cost|Category|Supplier
 101|Gaming Laptop|9|1200|950|Computers|TechCorp
 102|Wireless Mouse|50|45|25|Accessories|TechCorp
 103|Mech Keyboard|30|85|50|Accessories|TechCorp
-105|RTX 5090 Gold Edition|10|700|600|Accessories|Nvidia
+105|RTX 5090 Gold|10|700|600|GPU|Nvidia
 201|PS5 Console|15|499|450|Gaming|SonyHub
 202|Elden Ring|40|59.99|35|Games|FromSoft
+301|iPhone 15 Pro|12|999|850|Phones|AppleDist
+302|Samsung S24|10|899|750|Phones|SamsungHQ
+401|HDMI 2.1 Cable|100|19.99|5.00|Cables|Generic
+402|USB-C Fast Charger|60|25.00|8.00|Accessories|Anker
+501|27in 144Hz Monitor|8|250.00|180.00|Displays|LG
+505|4K OLED TV 55in|5|1200.00|900.00|Displays|SonyHub
+601|AirPods Pro 2|25|249.00|180.00|Audio|AppleDist
+602|Sony XM5 Headset|15|349.00|250.00|Audio|SonyHub
+701|Smart Watch Ultra|20|799.00|600.00|Wearables|AppleDist
