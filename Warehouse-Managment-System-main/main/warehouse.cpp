@@ -3,9 +3,9 @@
 #include <fstream>
 #include <cmath>
 #include <cstdlib>
-#include <iomanip> // For formatting money
+#include <iomanip> 
 #include <limits> 
-#include <sstream> // For log formatting 
+#include <sstream> 
 
 using namespace std;
 
@@ -13,8 +13,8 @@ using namespace std;
 // CONSTRUCTOR & STARTUP
 // ==========================================
 Warehouse::Warehouse() {
-    loadWorkers();   // [NEW] Load Security Database first
-    loadInventory(); // Load Product Data
+    loadWorkers();   // Load Staff from file
+    loadInventory(); // Load Products
     
     // Seed sample products if empty
     if (inventory.empty()) {
@@ -32,29 +32,123 @@ Warehouse::Warehouse() {
 }
 
 // ==========================================
-// SECURITY & SHIFT MANAGEMENT
+// WORKER MANAGEMENT (NEW)
 // ==========================================
 
 void Warehouse::loadWorkers() {
-    // [NEW] Valid Worker IDs
-    // In a real app, you would read this from a secure file
-    workerDB.root = workerDB.insertNode(workerDB.root, 101); // Worker A
-    workerDB.root = workerDB.insertNode(workerDB.root, 102); // Worker B
-    workerDB.root = workerDB.insertNode(workerDB.root, 205); // Manager
-    workerDB.root = workerDB.insertNode(workerDB.root, 999); // Admin
+    ifstream file("workers.txt");
+    if (!file) {
+        cout << "[SYSTEM] No workers.txt found. Creating default Admin." << endl;
+        // Default Admin if file missing
+        addNewWorker(999, "Super Admin", "Admin"); 
+        return;
+    }
+
+    staffList.clear();
+    // Rebuild BST from scratch
     
-    cout << "[SYSTEM] Worker Security Database loaded." << endl;
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        string segment;
+        vector<string> tokens;
+        
+        while(getline(ss, segment, '|')) {
+            tokens.push_back(segment);
+        }
+        
+        if (tokens.size() >= 3) {
+            int id = stoi(tokens[0]);
+            string name = tokens[1];
+            string role = tokens[2];
+            
+            WorkerRecord w = {id, name, role};
+            staffList.push_back(w);
+            workerDB.root = workerDB.insertNode(workerDB.root, id);
+        }
+    }
+    file.close();
+    cout << "[SYSTEM] Loaded " << staffList.size() << " workers from file." << endl;
 }
 
-bool Warehouse::validateLogin(int id) {
-    // Check if ID exists in the workerDB tree
-    return workerDB.searchNode(workerDB.root, id);
+void Warehouse::saveWorkers() {
+    ofstream file("workers.txt");
+    if (!file) {
+        cout << "[ERROR] Could not save workers!" << endl;
+        return;
+    }
+    for (const auto& w : staffList) {
+        file << w.id << "|" << w.name << "|" << w.role << endl;
+    }
+    file.close();
+    cout << "[SYSTEM] Worker database updated." << endl;
 }
 
-void Warehouse::startShift(string shiftName, string opName, int opID) {
+bool Warehouse::validateLogin(int id, string &retName, string &retRole) {
+    // 1. Check BST for speed/existence
+    if (!workerDB.searchNode(workerDB.root, id)) return false;
+    
+    // 2. Fetch Details from Vector
+    for (const auto& w : staffList) {
+        if (w.id == id) {
+            retName = w.name;
+            retRole = w.role;
+            return true;
+        }
+    }
+    return false;
+}
+
+void Warehouse::addNewWorker(int id, string name, string role) {
+    // Check duplicates
+    if (workerDB.searchNode(workerDB.root, id)) {
+        cout << "[ERROR] Worker ID " << id << " already exists!" << endl;
+        return;
+    }
+    
+    WorkerRecord w = {id, name, role};
+    staffList.push_back(w);
+    workerDB.root = workerDB.insertNode(workerDB.root, id);
+    saveWorkers(); // Auto-save
+    cout << "[SUCCESS] Added " << role << ": " << name << " (ID: " << id << ")" << endl;
+}
+
+void Warehouse::removeWorker(int id) {
+    bool found = false;
+    for (size_t i = 0; i < staffList.size(); i++) {
+        if (staffList[i].id == id) {
+            // Cannot delete yourself
+            if (staffList[i].id == operatorID) {
+                cout << "[ERROR] You cannot delete your own account while logged in!" << endl;
+                return;
+            }
+            
+            cout << "[SUCCESS] Removed " << staffList[i].name << endl;
+            staffList.erase(staffList.begin() + i);
+            found = true;
+            break;
+        }
+    }
+    
+    if (found) {
+        // Re-save file
+        saveWorkers();
+        workerDB.root = workerDB.deleteNode(workerDB.root, id);
+    } else {
+        cout << "[ERROR] Worker ID not found." << endl;
+    }
+}
+
+// ==========================================
+// SHIFT MANAGEMENT
+// ==========================================
+
+void Warehouse::startShift(string shiftName, string opName, int opID, string role) {
     currentShiftName = shiftName;
     operatorName = opName;
-    operatorID = opID; // Store ID
+    operatorID = opID; 
+    operatorRole = role; // [NEW]
     
     sessionRevenue = 0.0;
     sessionProfit = 0.0;
@@ -62,8 +156,7 @@ void Warehouse::startShift(string shiftName, string opName, int opID) {
     sessionSalesLog.clear(); 
     
     cout << "\n[SYSTEM] Shift Started: " << shiftName 
-         << " (Operator: " << opName << " | ID: " << opID << ")" << endl;
-    cout << "[SYSTEM] Session trackers reset to 0." << endl;
+         << " | Operator: " << opName << " (" << role << ")" << endl;
 }
 
 void Warehouse::endShift() {
@@ -72,6 +165,7 @@ void Warehouse::endShift() {
     cout << "==================================================" << endl;
     cout << " Shift:    " << currentShiftName << endl;
     cout << " Operator: " << operatorName << " (ID: " << operatorID << ")" << endl; 
+    cout << " Role:     " << operatorRole << endl;
     cout << " --------------------------------------------------" << endl;
     cout << " Items Sold:      " << sessionItemsSold << endl;
     cout << " Session Revenue: $" << fixed << setprecision(2) << sessionRevenue << endl;
@@ -576,4 +670,61 @@ void Warehouse::peekProduct(int id) {
         cout << "   [SCANNER] Found: " << inventory[index].getName() 
              << " | Unit Price: $" << inventory[index].getPrice() << endl;
     }
+}
+
+// ==========================================
+// RETURNS & OVERRIDES (NEW)
+// ==========================================
+
+// Helper: Checks what role an ID belongs to (for Manager Override)
+string Warehouse::getWorkerRole(int id) {
+    // Check our loaded staff list
+    for (const auto& w : staffList) {
+        if (w.id == id) {
+            return w.role;
+        }
+    }
+    return "Unknown";
+}
+
+void Warehouse::returnProduct(int id, int qty) {
+    int index = findProductIndex(id);
+    if (index == -1) {
+        cout << "[ERROR] Product not found in database. Cannot return." << endl;
+        return;
+    }
+
+    // 1. Restore Stock (Add items back to shelf)
+    inventory[index].restock(qty);
+
+    // 2. Calculate Refund Amounts
+    double price = inventory[index].getPrice();
+    double cost = inventory[index].getCost();
+    
+    double subtotal = price * qty;
+    double tax = subtotal * 0.14;
+    double totalRefund = subtotal + tax;    // This is what we pay back to customer
+    double profitReversal = (price - cost) * qty; // We lose the profit we made
+
+    // 3. Subtract from Financials
+    revenue -= totalRefund;
+    taxCollected -= tax;
+    netProfit -= profitReversal;
+
+    // 4. Update Session Stats (So the shift report is accurate)
+    sessionRevenue -= totalRefund;
+    sessionProfit -= profitReversal;
+    sessionItemsSold -= qty;
+
+    cout << "\n[SUCCESS] Refund Processed." << endl;
+    cout << " - Stock Restored: +" << qty << endl;
+    cout << " - Revenue Deducted: -$" << fixed << setprecision(2) << totalRefund << endl;
+    cout << " - Tax Adjusted: -$" << tax << endl;
+
+    // 5. Log it
+    string logEntry = "[RETURN] ID:" + to_string(id) + " | Qty:" + to_string(qty) + " | Refunded: $" + to_string(totalRefund);
+    sessionSalesLog.push_back(logEntry);
+    
+    // 6. Save immediately
+    saveInventory(); 
 }
