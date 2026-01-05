@@ -109,6 +109,7 @@ public:
     void sortByPrice();
     string getProductName(int id); 
     double getProductPrice(int id);
+    int getProductQuantity(int id);
 };
 
 #endif
