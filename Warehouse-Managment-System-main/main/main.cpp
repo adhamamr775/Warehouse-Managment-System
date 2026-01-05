@@ -7,21 +7,40 @@
 
 using namespace std;
 
-// ------------------------------------------------------------------
-// [SYSTEM CREDENTIALS]
-// 999 | Adham Amr      | Admin   
-// 205 | Mohamed Talaat | Manager 
-// 101 | Mohanad Fattah | Worker  
-// ------------------------------------------------------------------
+struct CartItem { int id; int qty; };
 
-struct CartItem {
-    int id;
-    int qty;
-};
-
+// ==========================================
+// INPUT HELPERS (Prevents Crashes)
+// ==========================================
 void clearInput() {
     cin.clear();
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+int getValidInt(string prompt) {
+    int x;
+    while (true) {
+        cout << prompt;
+        if (cin >> x) return x;
+        cout << "   [ERROR] Invalid input. Please enter a number.\n";
+        clearInput();
+    }
+}
+
+string getValidString(string prompt) {
+    string s;
+    while (true) {
+        cout << prompt;
+        if (cin.peek() == '\n') cin.ignore(); 
+        getline(cin, s);
+        
+        bool valid = true;
+        if (s.empty()) valid = false;
+        for (char c : s) if (isdigit(c)) valid = false; 
+
+        if (valid) return s;
+        cout << "   [ERROR] Text only (no numbers allowed).\n";
+    }
 }
 
 string cleanInput(string input) {
@@ -38,39 +57,45 @@ string formatName(string name) {
     return name;
 }
 
+// ==========================================
+// MENU
+// ==========================================
 void displayMenu(string role) {
     cout << "\n==========================================" << endl;
     cout << "    SMART WAREHOUSE SYSTEM    " << endl;
-    cout << "    Current Role: " << role << endl; 
+    cout << "    Role: " << role << endl; 
     cout << "==========================================" << endl;
-    cout << "1.  Add New Product" << endl;
+    cout << "1.  Add Product" << endl;
     cout << "2.  View Inventory" << endl;
     cout << "3.  Search Product" << endl; 
-    cout << "4.  Place Normal Order " << endl; 
-    cout << "5.  Place VIP Order " << endl;    
-    cout << "6.  Process All Orders" << endl;  
+    cout << "4.  Normal Order (Cart)" << endl; 
+    cout << "5.  VIP Order (Cart)" << endl;    
+    cout << "6.  Process Orders" << endl;  
     cout << "7.  Show Storage Layout" << endl; 
-    cout << "8.  Sort Inventory by ID" << endl;
-    cout << "9.  Sort Inventory by Price" << endl;
-    cout << "10. Export Report to File" << endl;
-    cout << "11. View Total Revenue" << endl;
+    cout << "8.  Sort by ID" << endl;
+    cout << "9.  Sort by Price" << endl;
+    cout << "10. Shift Report (Manager)" << endl; 
+    cout << "11. Total Revenue (Manager)" << endl;
     cout << "------------------------------------------" << endl;
     cout << "12. DELETE Product" << endl;
     cout << "13. Manual Restock" << endl;
     cout << "14. UNDO Last Action" << endl;
-    cout << "17. PROCESS RETURN " << endl; 
+    cout << "17. RETURN Item" << endl; 
     
     if (role == "Admin" || role == "Manager") {
         cout << "------------------------------------------" << endl;
-        cout << "15. [ADMIN] Add New Worker" << endl;
+        cout << "15. [ADMIN] Add Worker" << endl;
         cout << "16. [ADMIN] Remove Worker" << endl;
+        cout << "18. [ADMIN] View Staff Stats" << endl;
+        cout << "19. [ADMIN] Promote Worker" << endl;
+        cout << "20. [ADMIN] Pay Worker Bonus" << endl; // [NEW]
     }
-    
-    cout << "0.  End Shift (Logout)" << endl; 
-    cout << "==========================================" << endl;
-    cout << "Enter your choice: ";
+    cout << "0.  End Shift" << endl; 
 }
 
+// ==========================================
+// MAIN LOGIC
+// ==========================================
 int main() {
     Warehouse mySystem;
     
@@ -79,55 +104,38 @@ int main() {
         int opID = 0;
         bool isAuthenticated = false; 
 
-        cout << "\n\n";
-        cout << "##########################################" << endl;
-        cout << "#       WAREHOUSE LOGIN            #" << endl;
-        cout << "##########################################" << endl;
-        cout << "   (Type '0' to Shutdown)                 " << endl;
-        cout << "------------------------------------------" << endl;
+        cout << "\n\n### WAREHOUSE LOGIN ###\n";
+        cout << "(Type '0' to Shutdown)\n";
 
-        // --- 1. SHIFT VALIDATION LOOP (NEW) ---
+        // --- 1. SHIFT VALIDATION ---
         while (true) {
-            cout << "Enter Shift Name (Morning/Night): ";
+            cout << "Enter Shift (Morning/Night): ";
             cin.clear();
             getline(cin, shift);
-            
             if (shift == "0") {
-                cout << "System Shutting Down..." << endl;
+                cout << "[SYSTEM] Shutting Down...\n";
+                return 0;
+            }
+            shift = formatName(shift);
+            if (shift == "Morning" || shift == "Night") break;
+            cout << "[ERROR] Invalid Shift. Try 'Morning' or 'Night'.\n";
+        }
+
+        // --- 2. ID VALIDATION ---
+        string dbName, dbRole;
+        while (!isAuthenticated) {
+            opID = getValidInt("Enter Employee ID: ");
+            
+            if (opID == 0) {
+                cout << "[SYSTEM] Shutting Down...\n";
                 return 0;
             }
 
-            shift = formatName(shift); // Auto-fix: "morning" -> "Morning"
-
-            if (shift == "Morning" || shift == "Night") {
-                break; // Input is valid, exit the loop
-            } else {
-                cout << "[ERROR] Invalid Shift. Please enter 'Morning' or 'Night'.\n";
-            }
-        }
-
-        // --- 2. SECURE ID CHECK ---
-        string dbName, dbRole;
-        
-        while (!isAuthenticated) {
-            cout << "Enter Employee ID: ";
-            string idInput;
-            getline(cin, idInput); 
-
-            if (idInput == "0") return 0;
-
-            try {
-                if (!idInput.empty()) opID = stoi(idInput);
-            } catch (...) {
-                opID = -1;
-            }
-
             if (mySystem.validateLogin(opID, dbName, dbRole)) {
-                cout << "\n[SUCCESS] ID Verified." << endl;
-                cout << "Welcome, " << dbName << " (" << dbRole << ")!" << endl;
+                cout << "\n[SUCCESS] Welcome " << dbRole << ": " << dbName << endl;
                 isAuthenticated = true; 
             } else {
-                cout << "[ACCESS DENIED] ID " << opID << " not found." << endl;
+                cout << "[ACCESS DENIED] ID not found.\n";
             }
         }
 
@@ -136,38 +144,23 @@ int main() {
         
         while (loggedIn) {
             displayMenu(mySystem.getCurrentRole()); 
-            
-            int choice;
-            if (!(cin >> choice)) {
-                cout << "[ERROR] Invalid input." << endl;
-                clearInput();
-                continue;
-            }
+            int choice = getValidInt("Enter Choice: ");
 
             switch (choice) {
                 case 1: {
-                    if (mySystem.getCurrentRole() == "Worker") {
-                        cout << "\n[ACCESS DENIED] Only Admins or Managers can add new products." << endl;
-                        break; 
-                    }
-                    int id; 
-                    cout << "\n--- Add New Product ---" << endl;
-                    cout << "Enter Product ID: ";
-                    while (!(cin >> id)) { cout << "Invalid input. ID: "; clearInput(); }
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "\n[DENIED] Admin/Manager Only.\n"; break; }
+                    cout << "\n--- Add Product ---\n";
+                    int id = getValidInt("Product ID: ");
+                    if (mySystem.searchUsingTree(id)) { cout << "[ERROR] ID Exists!\n"; break; }
                     
-                    if (mySystem.searchUsingTree(id)) { 
-                        cout << "[ERROR] Product ID already exists!\n"; 
-                        break; 
-                    }
-                    int qty; double price, cost; string name, cat, supp;
-                    cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
-                    cout << "Enter Name: "; getline(cin, name);
-                    cout << "Enter Quantity: "; cin >> qty;
-                    cout << "Enter Selling Price: "; cin >> price;
-                    cout << "Enter Cost Price: "; cin >> cost;
-                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    cout << "Enter Category: "; getline(cin, cat);
-                    cout << "Enter Supplier: "; getline(cin, supp);
+                    string name = getValidString("Name: ");
+                    int qty = getValidInt("Quantity: ");
+                    double price, cost;
+                    cout << "Selling Price: "; cin >> price;
+                    cout << "Cost Price: "; cin >> cost;
+                    string cat = getValidString("Category: ");
+                    string supp = getValidString("Supplier: ");
+                    
                     mySystem.addProduct(id, name, qty, price, cost, cat, supp);
                     break;
                 }
@@ -175,137 +168,92 @@ int main() {
                 case 2: mySystem.listInventory(); break;
                 
                 case 3: { 
-                    int id; cout << "Enter ID: "; cin >> id; 
+                    int id = getValidInt("Enter ID to Search: ");
                     if(mySystem.searchUsingTree(id)) mySystem.peekProduct(id); 
                     else cout << "[ERROR] Not found.\n"; 
                     break; 
                 }
 
-                // --- CASE 4 & 5: CART WITH NAMES, PRICES & TOTALS ---
                 case 4: 
                 case 5: { 
                     string type = (choice == 4) ? "NORMAL" : "VIP";
-                    cout << "\n--- " << type << " Order (Cart Mode) ---" << endl;
-                    
                     vector<CartItem> tempCart; 
-                    string cName, cPhone, pMethod;
-                    cout << "Customer Name: "; cin.ignore(); getline(cin, cName);
-                    cout << "Phone: "; cin >> cPhone;
-                    cout << "Payment: "; cin >> pMethod; pMethod = cleanInput(pMethod);
+                    
+                    cout << "\n--- " << type << " Cart ---\n";
+                    string cName = getValidString("Customer Name: ");
+                    string cPhone; cout << "Phone: "; cin >> cPhone; 
+                    string pMethod = getValidString("Payment Method: ");
 
-                    // 1. Fill Cart
                     while(true) {
-                        int id, qty; 
-                        cout << "Product ID (0 to finish): "; cin >> id;
+                        int id = getValidInt("Product ID (0 to finish): ");
                         if (id == 0) break;
 
                         if(mySystem.searchUsingTree(id)) { 
                             string pName = mySystem.getProductName(id); 
                             int stock = mySystem.getProductQuantity(id);
-
-                            cout << "  -> Selected: " << pName << " (Available: " << stock << ")\n";
-                            cout << "  Quantity: "; cin >> qty; 
-
-                            if (qty > stock) {
-                                cout << "  [ERROR] Not enough stock! Max: " << stock << endl;
-                                continue;
-                            }
-                            if (qty <= 0) {
-                                cout << "  [ERROR] Invalid quantity." << endl;
-                                continue;
-                            }
+                            cout << " -> Selected: " << pName << " (Stock: " << stock << ")\n";
+                            
+                            int qty = getValidInt("Quantity: ");
+                            if (qty > stock) { cout << " [ERROR] Max stock is " << stock << endl; continue; }
+                            if (qty <= 0) { cout << " [ERROR] Invalid qty.\n"; continue; }
 
                             tempCart.push_back({id, qty});
-                            cout << "  [Cart] Item Added.\n"; 
-                        } else {
-                            cout << "  [ERROR] Not found." << endl;
-                        }
+                            cout << " [Cart] Added.\n"; 
+                        } else cout << " [ERROR] Not found.\n";
                     }
 
-                    // 2. Show Receipt & Confirm
-                    if (tempCart.empty()) {
-                        cout << "[CANCELLED] Cart empty." << endl;
-                        break;
+                    if (tempCart.empty()) { cout << "[CANCELLED] Cart Empty.\n"; break; }
+
+                    cout << "\n--- Confirm " << type << " Order ---\n";
+                    cout << left << setw(5) << "ID" << setw(20) << "Name" << setw(10) << "Qty" << setw(10) << "Price" << endl;
+                    double total = 0;
+                    for(auto &i : tempCart) {
+                        double p = mySystem.getProductPrice(i.id);
+                        cout << left << setw(5) << i.id << setw(20) << mySystem.getProductName(i.id) 
+                             << setw(10) << i.qty << "$" << p << endl;
+                        total += (p * i.qty);
                     }
+                    if(type=="VIP") { cout << "VIP Fee (10%): +$" << (total * 0.10) << endl; total *= 1.10; }
+                    cout << "TOTAL: $" << fixed << setprecision(2) << total << endl;
 
-                    cout << "\n================= CONFIRM CART (" << type << ") =================" << endl;
-                    cout << left << setw(5) << "ID" 
-                         << left << setw(20) << "Name" 
-                         << left << setw(8) << "Qty" 
-                         << left << setw(10) << "Price" 
-                         << left << setw(10) << "Subtotal" << endl;
-                    cout << "---------------------------------------------------------" << endl;
-
-                    double cartTotal = 0;
-                    
-                    for(auto &item : tempCart) {
-                        string name = mySystem.getProductName(item.id);
-                        double price = mySystem.getProductPrice(item.id);
-                        double lineTotal = price * item.qty;
-                        cartTotal += lineTotal;
-
-                        cout << left << setw(5) << item.id 
-                             << left << setw(20) << name 
-                             << left << setw(8) << item.qty 
-                             << "$" << left << setw(9) << price 
-                             << "$" << lineTotal << endl;
-                    }
-                    cout << "---------------------------------------------------------" << endl;
-                    
-                    double finalTotal = cartTotal;
-                    if (type == "VIP") {
-                         cout << "Subtotal:       $" << cartTotal << endl;
-                         cout << "VIP Fee (10%): +$" << (cartTotal * 0.10) << endl;
-                         finalTotal = cartTotal * 1.10;
-                    }
-                    
-                    cout << "ESTIMATED TOTAL: $" << fixed << setprecision(2) << finalTotal << endl;
-                    cout << "=========================================================" << endl;
-                    
-                    char confirm;
-                    cout << "Confirm Order? (y/n): "; cin >> confirm;
-
+                    char confirm; cout << "Confirm (y/n): "; cin >> confirm;
                     if (confirm == 'y' || confirm == 'Y') {
-                        for (auto &item : tempCart) {
-                            if (choice == 4) mySystem.addToOrderQueue(item.id, item.qty, pMethod, cName, cPhone);
-                            else mySystem.addVIPOrder(item.id, item.qty, pMethod, cName, cPhone);
+                        mySystem.logEvent(">>> NEW CART [" + type + "] Customer: " + cName);
+                        for (auto &i : tempCart) {
+                            if (choice == 4) mySystem.addToOrderQueue(i.id, i.qty, pMethod, cName, cPhone);
+                            else mySystem.addVIPOrder(i.id, i.qty, pMethod, cName, cPhone);
                         }
-                        cout << "[SUCCESS] Order sent to " << type << " Queue." << endl;
-                    } else {
-                        cout << "[CANCELLED] Order discarded." << endl;
-                    }
+                        cout << "[SUCCESS] Sent to Queue.\n";
+                    } else cout << "[CANCELLED]\n";
                     break;
                 }
 
                 case 6: mySystem.processOrders(); break;
-                
                 case 7: mySystem.showStorageLayout(); break;
                 case 8: mySystem.sortByID(); break;
                 case 9: mySystem.sortByPrice(); break;
-                case 10: mySystem.exportToFile(); break;
-                case 11: mySystem.showRevenue(); break;
+                
+                case 10: { 
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Manager Only.\n"; break; }
+                    mySystem.printShiftReport(); 
+                    cout << "Press Enter..."; cin.ignore(); cin.get();
+                    break;
+                }
+
+                case 11: 
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Manager Only.\n"; break; }
+                    mySystem.showRevenue(); 
+                    break;
 
                 case 12: { 
-                    if (mySystem.getCurrentRole() == "Worker") {
-                        cout << "\n[ACCESS DENIED] Only Admins or Managers can delete products." << endl;
-                        break;
-                    }
-                    int id; cout << "Delete ID: "; cin >> id; 
-                    mySystem.removeProduct(id); 
-                    break; 
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin/Manager Only.\n"; break; }
+                    int id = getValidInt("Delete ID: "); mySystem.removeProduct(id); break; 
                 }
 
                 case 13: { 
-                    if (mySystem.getCurrentRole() == "Worker") {
-                        cout << "\n[ACCESS DENIED] Only Admins or Managers can restock inventory." << endl;
-                        break;
-                    }
-                    int id, q; 
-                    cout << "\n--- Manual Restock ---" << endl;
-                    cout << "Restock ID: "; cin >> id; 
-                    cout << "Qty to add: "; cin >> q; 
-                    mySystem.manualRestock(id, q); 
-                    break; 
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin/Manager Only.\n"; break; }
+                    int id = getValidInt("ID: "); int q = getValidInt("Add Qty: ");
+                    mySystem.manualRestock(id, q); break; 
                 }
 
                 case 14: 
@@ -315,63 +263,81 @@ int main() {
                     break;
                 
                 case 17: {
-                    cout << "\n--- Process Return / Refund ---" << endl;
-                    char warranty;
-                    cout << "Check Warranty (y/n): "; cin >> warranty;
-                    if (warranty == 'n' || warranty == 'N') {
-                        cout << "[REJECTED] Warranty Invalid." << endl;
-                        break;
-                    }
+                    cout << "\n--- Process Return ---\n";
+                    char w; cout << "Warranty Valid? (y/n): "; cin >> w;
+                    if (w == 'n' || w == 'N') { cout << "Return Rejected.\n"; break; }
 
                     if (mySystem.getCurrentRole() == "Worker") {
-                        int authID;
-                        cout << "Manager ID Required: "; cin >> authID;
-                        string authRole = mySystem.getWorkerRole(authID);
-                        if (authRole != "Admin" && authRole != "Manager") {
-                            cout << "[ACCESS DENIED] Invalid Manager ID." << endl;
+                        int mid = getValidInt("Manager ID Override: ");
+                        string r = mySystem.getWorkerRole(mid);
+                        if (r != "Admin" && r != "Manager") { 
+                            cout << "[DENIED] Invalid Manager ID.\n"; 
                             break; 
                         }
-                        cout << "[AUTHORIZED] Override accepted." << endl;
+                        cout << "[AUTHORIZED] Override Accepted.\n";
                     }
 
-                    int id, qty;
-                    cout << "Product ID: "; cin >> id;
-                    if (!mySystem.searchUsingTree(id)) { cout << "[ERROR] ID not found." << endl; break; }
-                    cout << "Return Qty: "; cin >> qty;
+                    int id = getValidInt("Product ID: ");
+                    if (!mySystem.searchUsingTree(id)) { cout << "ID Not Found.\n"; break; }
+                    
+                    int qty = getValidInt("Return Qty: ");
                     mySystem.returnProduct(id, qty);
                     break;
                 }
 
                 case 15: {
-                    if (mySystem.getCurrentRole() != "Admin" && mySystem.getCurrentRole() != "Manager") {
-                        cout << "[ACCESS DENIED]" << endl; break;
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin Only.\n"; break; }
+                    
+                    cout << "\n--- Add New Worker ---\n";
+                    int nid = getValidInt("New ID: "); 
+                    if (mySystem.workerExists(nid)) {
+                        cout << "   [ERROR] ID Taken! Try another.\n";
+                        break; 
                     }
-                    int nid; string nname, nrole;
-                    cout << "New ID: "; cin >> nid; cin.ignore();
-                    cout << "Name: "; getline(cin, nname); nname = formatName(nname); 
-                    cout << "Role: "; cin >> nrole; nrole = formatName(nrole); 
+
+                    string nname = getValidString("Name: "); 
+                    string nrole = getValidString("Role: ");
                     mySystem.addNewWorker(nid, nname, nrole);
                     break;
                 }
                 
                 case 16: {
-                    if (mySystem.getCurrentRole() != "Admin" && mySystem.getCurrentRole() != "Manager") {
-                        cout << "[ACCESS DENIED]" << endl; break;
-                    }
-                    int rid; cout << "Worker ID to remove: "; cin >> rid;
-                    mySystem.removeWorker(rid);
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin Only.\n"; break; }
+                    int rid = getValidInt("Remove ID: "); mySystem.removeWorker(rid); break;
+                }
+
+                case 18: {
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin/Manager Only.\n"; break; }
+                    mySystem.listWorkers(); 
+                    break;
+                }
+
+                case 19: {
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin/Manager Only.\n"; break; }
+                    cout << "\n--- Promote Staff ---\n";
+                    mySystem.listWorkers(); 
+                    int pid = getValidInt("Enter Worker ID to Promote: ");
+                    mySystem.promoteWorker(pid);
+                    break;
+                }
+
+                case 20: {
+                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin/Manager Only.\n"; break; }
+                    cout << "\n--- Pay Bonus ---\n";
+                    mySystem.listWorkers(); 
+                    int pid = getValidInt("Enter Worker ID to Pay: ");
+                    mySystem.payWorkerBonus(pid);
                     break;
                 }
 
                 case 0: 
-                    mySystem.saveInventory();
                     mySystem.endShift(); 
-                    cout << "\n[INFO] Logging out..." << endl;
+                    cout << "\n[INFO] Logged out.\n";
                     cin.ignore(); cin.get();
                     loggedIn = false; 
                     break;
 
-                default: cout << "[ERROR] Invalid choice." << endl;
+                default: cout << "[ERROR] Invalid choice.\n";
             }
         }
     }
