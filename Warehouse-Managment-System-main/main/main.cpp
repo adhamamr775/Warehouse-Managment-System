@@ -328,12 +328,18 @@ int main() {
                     mySystem.payWorkerBonus(pid);
                     break;
                 }
-
                 case 21: {
-                    if (mySystem.getCurrentRole() != "Admin") { cout << "[DENIED] Super Admin Only.\n"; break; }
+                    // [UPDATED] Allow both Admin AND Manager
+                    string r = mySystem.getCurrentRole();
+                    if (r != "Admin" && r != "Manager") { 
+                        cout << "[DENIED] Admin or Manager Only.\n"; 
+                        break; 
+                    }
+
                     cout << "\n[WARNING] This will delete ALL past shift reports.\n";
                     cout << "Are you sure? (y/n): ";
                     char confirm; cin >> confirm;
+                    
                     if (confirm == 'y' || confirm == 'Y') {
                         mySystem.clearShiftHistory();
                     } else {
