@@ -27,127 +27,82 @@ Warehouse::Warehouse() {
 }
 
 // ==========================================
-// WORKER MANAGEMENT
+// WORKER MANAGEMENT (FIXED)
 // ==========================================
 void Warehouse::loadWorkers() {
     ifstream file("workers.txt");
     staffList.clear();
 
-    // Default Admin if file is missing
-    if (!file) {
-        WorkerRecord w = {999, "Super Admin", "Admin", 0, 0.0, 0.0, 0};
-        staffList.push_back(w);
-        workerDB.root = workerDB.insertNode(workerDB.root, 999);
-        return;
-    }
-    
-    string line;
-    // Skip Header line
-    getline(file, line); 
+    if (file) {
+        string line;
+        // Skip Header
+        getline(file, line); 
 
-    while (getline(file, line)) {
-        if (line.empty()) continue;
-        
-        stringstream ss(line);
-        string segment;
-        vector<string> tokens;
-        
-        // Parse using Pipe Delimiter
-        while(getline(ss, segment, '|')) tokens.push_back(segment);
-        
-        if (tokens.size() >= 3) {
-            try {
-                int id = stoi(tokens[0]);
-                string name = tokens[1];
-                string role = tokens[2];
-                
-                // Load saved state (Bonus progress, accumulated earnings)
-                int n_cnt = (tokens.size() > 3) ? stoi(tokens[3]) : 0;
-                double b_prof = (tokens.size() > 4) ? stod(tokens[4]) : 0.0;
-                double tot_earn = (tokens.size() > 5) ? stod(tokens[5]) : 0.0;
-                int tot_ords = (tokens.size() > 6) ? stoi(tokens[6]) : 0; 
+        while (getline(file, line)) {
+            if (line.empty()) continue;
+            // Skip lines that are just headers repeated
+            if (!isdigit(line[0])) continue;
 
-                WorkerRecord w = {id, name, role, n_cnt, b_prof, tot_earn, tot_ords};
-                staffList.push_back(w);
-                workerDB.root = workerDB.insertNode(workerDB.root, id);
-            } catch (...) {
-                continue; // Skip malformed lines
+            stringstream ss(line);
+            string segment;
+            vector<string> tokens;
+            while(getline(ss, segment, '|')) tokens.push_back(segment);
+
+            // WE NOW EXPECT 7 COLUMNS: 
+            // ID | Name | Role | Salary | TotalOrders | VIPOrders | Wallet
+            if (tokens.size() >= 7) { 
+                try {
+                    WorkerRecord w;
+                    w.id = stoi(tokens[0]);
+                    w.name = tokens[1];
+                    w.role = tokens[2];
+                    
+                    // --- NEW DATA MAPPING ---
+                    w.salary = stod(tokens[3]);        // Column 4 is Salary
+                    w.totalOrders = stoi(tokens[4]);   // Column 5 is Total Orders
+                    w.vipOrders = stoi(tokens[5]);     // Column 6 is VIP Count
+                    w.totalEarnings = stod(tokens[6]); // Column 7 is Wallet
+                    
+                    // Reset internal counters (not saved in file)
+                    w.normalCount = w.totalOrders % 5; 
+                    w.batchProfit = 0.0;
+
+                    staffList.push_back(w);
+                } catch (...) { continue; }
             }
         }
+        file.close();
     }
-    file.close();
-}
 
+    // Fail-safe: Create Admin if empty
+    if (staffList.empty()) {
+        cout << "[SYSTEM] No workers found. Creating Default Admin.\n";
+        // ID, Name, Role, Salary, Wallet, TotalOrders, VIP, NormalCount, BatchProf
+        WorkerRecord admin = {999, "Admin", "Admin", 10000.0, 0.0, 0, 0, 0, 0.0};
+        staffList.push_back(admin);
+        saveWorkers();
+    }
+}
 void Warehouse::saveWorkers() {
     ofstream file("workers.txt");
-    // Header for readability
-    file << "ID|Name|Role|ProgressCount|CurrentBatchProfit|UnpaidBonus|LifetimeOrders" << endl;
+    // 1. WRITE THE CORRECT HEADER
+    file << "ID|Name|Role|Salary|TotalOrders|VIPOrders|Wallet" << endl;
     
+    // 2. WRITE DATA IN CORRECT ORDER
     for (const auto& w : staffList) {
-        file << w.id << "|" << w.name << "|" << w.role << "|" 
-             << w.normalCount << "|" << w.batchProfit << "|" << w.totalEarnings << "|" << w.totalOrders << endl;
+        file << w.id << "|" 
+             << w.name << "|" 
+             << w.role << "|" 
+             << w.salary << "|"        // Save Salary
+             << w.totalOrders << "|"   // Save Orders
+             << w.vipOrders << "|"     // Save VIP Count
+             << w.totalEarnings << endl; // Save Wallet
     }
     file.close();
-}
-
-void Warehouse::payWorkerBonus(int id) {
-    bool found = false;
-    for (auto& w : staffList) {
-        if (w.id == id) {
-            found = true;
-            
-            if (w.totalEarnings <= 0) {
-                cout << "   [INFO] " << w.name << " has no pending bonus to pay.\n";
-                return;
-            }
-
-            cout << "\n   $$$ PAYROLL PROCESSING $$$\n";
-            cout << "   --------------------------\n";
-            cout << "   Worker: " << w.name << endl;
-            cout << "   Amount: $" << fixed << setprecision(2) << w.totalEarnings << endl;
-            
-            // Log for report
-            string msg = "[PAYOUT] Paid $" + to_string(w.totalEarnings) + " to " + w.name + " (ID:" + to_string(id) + ")";
-            logEvent(msg);
-
-            // RESET LOGIC
-            w.totalEarnings = 0.0; // Clear the bucket
-            saveWorkers();         // Persist the reset immediately
-            
-            cout << "   [SUCCESS] Funds Transferred. Balance reset to $0.00.\n";
-            break;
-        }
-    }
-    if (!found) cout << "   [ERROR] Worker ID not found.\n";
-}
-
-void Warehouse::promoteWorker(int id) {
-    if (id == operatorID) {
-        cout << "   [SECURITY] You cannot promote yourself!\n";
-        return;
-    }
-
-    bool found = false;
-    for (auto& w : staffList) {
-        if (w.id == id) {
-            if (w.role == "Admin") { cout << "   [ERROR] Cannot change Admin status.\n"; return; }
-            if (w.role == "Manager") { cout << "   [INFO] User is already a Manager.\n"; return; }
-            
-            w.role = "Manager";
-            found = true;
-            cout << "   [SUCCESS] Promoted " << w.name << " to Manager.\n";
-            
-            logEvent("[ADMIN] Promoted " + w.name + " (ID:" + to_string(id) + ") to Manager");
-            break;
-        }
-    }
-    
-    if (found) saveWorkers(); 
-    else cout << "   [ERROR] Worker ID not found.\n";
 }
 
 bool Warehouse::validateLogin(int id, string &retName, string &retRole) {
-    if (!workerDB.searchNode(workerDB.root, id)) return false;
+    // Iterate the vector directly (Safer than tree if tree isn't synced)
     for (const auto& w : staffList) {
         if (w.id == id) { 
             retName = w.name; 
@@ -158,16 +113,64 @@ bool Warehouse::validateLogin(int id, string &retName, string &retRole) {
     return false;
 }
 
-void Warehouse::addNewWorker(int id, string name, string role) {
-    if (workerDB.searchNode(workerDB.root, id)) { 
-        cout << "[ERROR] Worker ID " << id << " already exists!\n"; return; 
+// ... (Rest of your functions remain exactly the same as you provided) ...
+
+void Warehouse::payWorkerBonus(int id) {
+    bool found = false;
+    for (auto& w : staffList) {
+        if (w.id == id) {
+            found = true;
+            if (w.totalEarnings <= 0) {
+                cout << "   [INFO] " << w.name << " has no pending bonus to pay.\n";
+                return;
+            }
+            cout << "\n   $$$ PAYROLL PROCESSING $$$\n";
+            cout << "   --------------------------\n";
+            cout << "   Worker: " << w.name << endl;
+            cout << "   Amount: $" << fixed << setprecision(2) << w.totalEarnings << endl;
+            string msg = "[PAYOUT] Paid $" + to_string(w.totalEarnings) + " to " + w.name + " (ID:" + to_string(id) + ")";
+            logEvent(msg);
+            w.totalEarnings = 0.0; 
+            saveWorkers();        
+            cout << "   [SUCCESS] Funds Transferred. Balance reset to $0.00.\n";
+            break;
+        }
     }
-    // Initialize with 0 progress
-    WorkerRecord w = {id, name, role, 0, 0.0, 0.0, 0};
+    if (!found) cout << "   [ERROR] Worker ID not found.\n";
+}
+
+void Warehouse::promoteWorker(int id) {
+    if (id == operatorID) { cout << "   [SECURITY] You cannot promote yourself!\n"; return; }
+    bool found = false;
+    for (auto& w : staffList) {
+        if (w.id == id) {
+            if (w.role == "Admin") { cout << "   [ERROR] Cannot change Admin status.\n"; return; }
+            if (w.role == "Manager") { cout << "   [INFO] User is already a Manager.\n"; return; }
+            w.role = "Manager";
+            found = true;
+            cout << "   [SUCCESS] Promoted " << w.name << " to Manager.\n";
+            logEvent("[ADMIN] Promoted " + w.name + " (ID:" + to_string(id) + ") to Manager");
+            break;
+        }
+    }
+    if (found) saveWorkers(); 
+    else cout << "   [ERROR] Worker ID not found.\n";
+}
+
+void Warehouse::addNewWorker(int id, string name, string role, double salary) {
+    // Check vector directly for duplicates
+    for(const auto& w : staffList) { 
+        if(w.id == id) { cout << "[ERROR] ID Exists!\n"; return; }
+    }
+
+    // Create the worker with the Salary
+    // ID, Name, Role, Salary, Wallet, TotalOrders, VIP, NormalCount, BatchProfit
+    WorkerRecord w = {id, name, role, salary, 0.0, 0, 0, 0, 0.0};
+    
     staffList.push_back(w);
-    workerDB.root = workerDB.insertNode(workerDB.root, id);
-    saveWorkers();
-    cout << "[SUCCESS] Added " << role << ": " << name << endl;
+    saveWorkers(); // This saves it to workers.txt with the new format
+    
+    cout << "[SUCCESS] Added " << role << ": " << name << " (Salary: $" << salary << ")\n";
 }
 
 void Warehouse::removeWorker(int id) {
@@ -181,7 +184,7 @@ void Warehouse::removeWorker(int id) {
         }
     }
     if (found) {
-        workerDB.root = workerDB.deleteNode(workerDB.root, id);
+        // workerDB.root = workerDB.deleteNode(workerDB.root, id); // Optional
         saveWorkers();
         cout << "[SUCCESS] Worker removed.\n";
     } else cout << "[ERROR] Not found.\n";
@@ -193,9 +196,7 @@ void Warehouse::listWorkers() {
          << setw(15) << "LIFETIME ORDS" << setw(15) << "BONUS PROG" << setw(15) << "UNPAID CASH" << endl;
     cout << "-----------------------------------------------------------------------------------" << endl;
     for (const auto& w : staffList) {
-        // Visual progress bar for bonus (e.g., 3/5)
         string prog = to_string(w.normalCount % 5) + "/5 Orders"; 
-        
         cout << left << setw(8) << w.id 
              << setw(15) << w.name 
              << setw(10) << w.role 
@@ -206,7 +207,11 @@ void Warehouse::listWorkers() {
     cout << "===================================================================================\n";
 }
 
-bool Warehouse::workerExists(int id) { return workerDB.searchNode(workerDB.root, id); }
+bool Warehouse::workerExists(int id) { 
+    for(const auto& w : staffList) if(w.id == id) return true;
+    return false;
+}
+
 string Warehouse::getWorkerRole(int id) {
     for(const auto& w : staffList) if(w.id == id) return w.role;
     return "Unknown";
@@ -258,15 +263,11 @@ void Warehouse::archiveShift() {
         if (sessionSalesLog.empty()) {
             file << "  (No activity)\n";
         } else {
-            // Aggregate sales by parsing the simplified log
             map<string, int> counts;
-            
             for (const string& line : sessionSalesLog) {
-                // Log format expected: "[Type] Name xQty | $Price"
                 if (line.find("[Normal]") != string::npos || line.find("[VIP]") != string::npos) {
                     size_t typeEnd = line.find("] ");
                     size_t qtyStart = line.rfind(" x"); 
-                    
                     if (typeEnd != string::npos && qtyStart != string::npos) {
                         string pName = line.substr(typeEnd + 2, qtyStart - (typeEnd + 2));
                         string sQty = line.substr(qtyStart + 2, line.find(" |") - (qtyStart + 2));
@@ -274,7 +275,6 @@ void Warehouse::archiveShift() {
                     }
                 }
             }
-            
             for (auto const& [name, count] : counts) {
                 file << "  - " << left << setw(20) << name << ": " << count << " units\n";
             }
@@ -294,7 +294,6 @@ void Warehouse::printShiftReport() {
     cout << "Operator: " << operatorName << "\n";
     cout << "Revenue:  $" << sessionRevenue << "\n";
     
-    // Show current operator's specific stats
     for(const auto& w : staffList) {
         if(w.id == operatorID) {
             cout << " > My Orders:     " << w.totalOrders << endl; 
@@ -305,7 +304,6 @@ void Warehouse::printShiftReport() {
     }
     cout << "----------------------------\n";
     cout << "[Recent Logs]:\n";
-    // Show last 5 logs only to avoid clutter
     int start = (sessionSalesLog.size() > 5) ? sessionSalesLog.size() - 5 : 0;
     for(size_t i = start; i < sessionSalesLog.size(); ++i) {
         cout << " " << sessionSalesLog[i] << endl;
@@ -448,17 +446,23 @@ void Warehouse::processOrders() {
                         }
                     } 
                     else if (type == "VIP") {
-                        // Immediate commission for VIP
-                        double vRate = (currentWorker->role == "Manager") ? 0.07 : 0.05;
-                        double vBonus = itemProfit * vRate;
-                        currentWorker->totalEarnings += vBonus;
-                        
-                        netProfit -= vBonus;
-                        sessionProfit -= vBonus;
+    currentWorker->vipOrders++; // Increment VIP count
 
-                        cout << "   >>> VIP COMMISSION! Added $" << vBonus << " to wallet <<<\n";
-                        logEvent("[BONUS] VIP Commission: $" + to_string(vBonus) + " to " + currentWorker->name);
-                    }
+    // --- SALARY PERCENTAGE BONUS LOGIC ---
+    // Example: Manager gets 5% of Salary, Worker gets 2% of Salary per VIP order
+    double percentage = (currentWorker->role == "Manager") ? 0.05 : 0.02;
+    double vBonus = currentWorker->salary * percentage; 
+
+    // Add to wallet
+    currentWorker->totalEarnings += vBonus;
+    
+    // Deduct from company profit (Expense)
+    netProfit -= vBonus;
+    sessionProfit -= vBonus;
+
+    cout << "   >>> VIP BONUS! Added $" << vBonus << " (Based on Salary) <<<\n";
+    logEvent("[BONUS] VIP Reward: $" + to_string(vBonus) + " to " + currentWorker->name);
+}
                 }
                 // ---------------------------------------------
 
