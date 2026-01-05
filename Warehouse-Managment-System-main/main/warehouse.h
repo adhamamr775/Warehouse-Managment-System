@@ -16,15 +16,23 @@
 #include "../header/algos/sorting.h"
 
 using namespace std;
-
 struct WorkerRecord {
+    // --- IDENTITY ---
     int id;
     string name;
     string role; 
-    int normalCount;       
-    double batchProfit;    
-    double totalEarnings;  
-    int totalOrders;       
+
+    // --- FINANCIALS (New!) ---
+    double salary;          // Base Salary (Needed for % calculation)
+    double totalEarnings;   // This acts as the "Wallet" for bonuses
+
+    // --- METRICS ---
+    int totalOrders;        // Total lifetime orders
+    int vipOrders;          // Count of VIP orders (New!)
+
+    // --- INTERNAL TRACKERS (For Batch Logic) ---
+    int normalCount;        // Tracks progress (e.g., 3/5 orders)
+    double batchProfit;     // Temporary profit pool for the current batch
 };
 
 class Warehouse {
@@ -59,7 +67,7 @@ public:
     void loadWorkers();             
     void saveWorkers();             
     bool validateLogin(int id, string &retName, string &retRole); 
-    void addNewWorker(int id, string name, string role);
+   void addNewWorker(int id, string name, string role, double salary);
     bool workerExists(int id);
     void removeWorker(int id);
     void promoteWorker(int id); 
