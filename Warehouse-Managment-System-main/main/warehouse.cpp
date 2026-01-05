@@ -16,6 +16,7 @@ Warehouse::Warehouse() {
     loadWorkers();   
     loadInventory(); 
     
+    // Seed defaults only if inventory is empty (Silent Mode = true)
     if (inventory.empty()) {
         addProduct(101, "Gaming Laptop", 10, 1200.00, 950.00, "Computers", "TechCorp", true);
         addProduct(102, "Wireless Mouse", 50, 45.00, 25.00, "Accessories", "TechCorp", true);
@@ -29,6 +30,7 @@ Warehouse::Warehouse() {
 void Warehouse::loadWorkers() {
     ifstream file("workers.txt");
     if (!file) {
+        // Default admin: ID, Name, Role, NormalCnt, BatchProf, Earnings, TotalOrders
         WorkerRecord w = {999, "Super Admin", "Admin", 0, 0.0, 0.0, 0};
         staffList.push_back(w);
         workerDB.root = workerDB.insertNode(workerDB.root, 999);
@@ -48,6 +50,7 @@ void Warehouse::loadWorkers() {
             string name = tokens[1];
             string role = tokens[2];
             
+            // Incremental Loading (Handles old files gracefully)
             int n_cnt = (tokens.size() > 3) ? stoi(tokens[3]) : 0;
             double b_prof = (tokens.size() > 4) ? stod(tokens[4]) : 0.0;
             double tot_earn = (tokens.size() > 5) ? stod(tokens[5]) : 0.0;
@@ -64,6 +67,7 @@ void Warehouse::loadWorkers() {
 void Warehouse::saveWorkers() {
     ofstream file("workers.txt");
     for (const auto& w : staffList) {
+        // Save all 7 columns
         file << w.id << "|" << w.name << "|" << w.role << "|" 
              << w.normalCount << "|" << w.batchProfit << "|" << w.totalEarnings << "|" << w.totalOrders << endl;
     }
@@ -84,6 +88,7 @@ void Warehouse::payWorkerBonus(int id) {
             cout << "   [PAYROLL] Processing payout of $" << fixed << setprecision(2) << w.totalEarnings 
                  << " to " << w.name << "...\n";
             
+            // Log for report
             string msg = "[PAYOUT] Paid $" + to_string(w.totalEarnings) + " to " + w.name + " (ID:" + to_string(id) + ")";
             logEvent(msg);
 
@@ -97,9 +102,8 @@ void Warehouse::payWorkerBonus(int id) {
     if (!found) cout << "   [ERROR] Worker ID not found.\n";
 }
 
-// [UPDATED] Promote Worker with Security Checks
 void Warehouse::promoteWorker(int id) {
-    // 1. Prevent Self-Promotion
+    // 1. Security: No Self-Promotion
     if (id == operatorID) {
         cout << "   [SECURITY] You cannot promote yourself!\n";
         return;
@@ -108,23 +112,16 @@ void Warehouse::promoteWorker(int id) {
     bool found = false;
     for (auto& w : staffList) {
         if (w.id == id) {
-            // 2. Prevent tampering with Admins
-            if (w.role == "Admin") { 
-                cout << "   [ERROR] Cannot change Admin status.\n"; 
-                return; 
-            }
-            // 3. Prevent redundant promotions
-            if (w.role == "Manager") { 
-                cout << "   [INFO] User is already a Manager.\n"; 
-                return; 
-            }
-            
-            // 4. Logic: Managers can only promote Workers
-            // (If we reached here, w.role is likely "Worker")
+            // 2. Security: Protect Admins/Managers
+            if (w.role == "Admin") { cout << "   [ERROR] Cannot change Admin status.\n"; return; }
+            if (w.role == "Manager") { cout << "   [INFO] User is already a Manager.\n"; return; }
             
             w.role = "Manager";
             found = true;
             cout << "   [SUCCESS] Promoted " << w.name << " to Manager.\n";
+            
+            // Log for report
+            logEvent("[ADMIN] Promoted " + w.name + " (ID:" + to_string(id) + ") to Manager");
             break;
         }
     }
@@ -199,6 +196,9 @@ string Warehouse::getWorkerRole(int id) {
     return "Unknown";
 }
 
+// ==========================================
+// SHIFT & REPORTS
+// ==========================================
 void Warehouse::startShift(string shiftName, string opName, int opID, string role) {
     currentShiftName = shiftName;
     operatorName = opName;
@@ -213,6 +213,17 @@ void Warehouse::endShift() {
     printShiftReport(); 
     archiveShift();     
     saveInventory();    
+}
+
+void Warehouse::clearShiftHistory() {
+    ofstream file("warehouse_report.txt", ios::trunc); // WIPE FILE
+    if (file) {
+        file << "=== REPORT HISTORY CLEARED ===\n"; 
+        file.close();
+        cout << "   [SUCCESS] All shift reports have been deleted permanently.\n";
+    } else {
+        cout << "   [ERROR] Could not access report file.\n";
+    }
 }
 
 void Warehouse::archiveShift() {
@@ -266,6 +277,9 @@ void Warehouse::printShiftReport() {
 
 void Warehouse::logEvent(string msg) { sessionSalesLog.push_back(msg); }
 
+// ==========================================
+// INVENTORY
+// ==========================================
 void Warehouse::addProduct(int id, string name, int quantity, double price, double cost, string category, string supplier, bool silent) {
     if (idIndex.searchNode(idIndex.root, id)) { if (!silent) cout << "[ERROR] ID Taken!\n"; return; }
     Product p(id, name, quantity, price, cost, category, supplier);
@@ -319,6 +333,9 @@ string Warehouse::getProductName(int id) { int i=findProductIndex(id); return (i
 double Warehouse::getProductPrice(int id) { int i=findProductIndex(id); return (i!=-1)?inventory[i].getPrice():0.0; }
 int Warehouse::getProductQuantity(int id) { int i=findProductIndex(id); return (i!=-1)?inventory[i].getQuantity():0; }
 
+// ==========================================
+// ORDERS & BONUS LOGIC
+// ==========================================
 void Warehouse::addToOrderQueue(int id, int qty, string pay, string n, string p) {
     Order o = {id, qty, pay, n, p, nullptr}; orderQueue.enqueue(o);
 }
@@ -330,6 +347,7 @@ void Warehouse::processOrders() {
     cout << "\n[1] VIP  [2] Normal  [3] All  [0] Back: ";
     int choice; cin >> choice; if(choice==0) return;
 
+    // Identify current worker
     WorkerRecord* currentWorker = nullptr;
     for(auto &w : staffList) {
         if(w.id == operatorID) { currentWorker = &w; break; }
@@ -343,8 +361,8 @@ void Warehouse::processOrders() {
             int idx = findProductIndex(o.id);
             
             if(idx != -1 && inventory[idx].getQuantity() >= o.qty) {
+                // Sell Logic
                 inventory[idx].sell(o.qty);
-                
                 double pr = inventory[idx].getPrice();
                 double cost = inventory[idx].getCost();
                 double sub = pr * o.qty;
@@ -353,33 +371,41 @@ void Warehouse::processOrders() {
                 double profit = (pr - cost) * o.qty;
                 if(type=="VIP") profit += (sub - (pr*o.qty));
 
+                // ---------------------------------------------
+                // BONUS LOGIC
+                // ---------------------------------------------
                 if(currentWorker != nullptr) {
-                    currentWorker->totalOrders++; 
+                    currentWorker->totalOrders++; // Lifetime Count
 
                     if (type == "Normal") {
                         currentWorker->batchProfit += profit;
                         currentWorker->normalCount++;
+                        
+                        // Every 5th normal order triggers Bonus
                         if (currentWorker->normalCount % 5 == 0) {
                             double rate = (currentWorker->role == "Manager") ? 0.03 : 0.02; 
                             double bonus = currentWorker->batchProfit * rate;
                             currentWorker->totalEarnings += bonus;
-                            cout << "   >>> BATCH BONUS! $" << bonus << " <<<\n";
-                            currentWorker->batchProfit = 0; 
+                            
+                            cout << "   >>> BATCH COMPLETE! Bonus: $" << bonus << " <<<\n";
+                            currentWorker->batchProfit = 0; // Reset pool
                         }
                     } 
                     else if (type == "VIP") {
                         double vRate = (currentWorker->role == "Manager") ? 0.07 : 0.05;
                         double vBonus = profit * vRate;
                         currentWorker->totalEarnings += vBonus;
-                        cout << "   >>> VIP COMMISSION! $" << vBonus << " <<<\n";
+                        cout << "   >>> VIP COMMISSION! Bonus: $" << vBonus << " <<<\n";
                     }
                 }
+                // ---------------------------------------------
 
                 revenue += (sub * 1.14); 
                 netProfit += profit;
                 sessionRevenue += (sub * 1.14); 
                 sessionItemsSold += o.qty;
 
+                // Log
                 stringstream ss; ss << fixed << setprecision(2) << (sub * 1.14);
                 string l = "[" + type + "] " + inventory[idx].getName() + " x" + to_string(o.qty) + " | $" + ss.str();
                 sessionSalesLog.push_back(l);
@@ -394,7 +420,7 @@ void Warehouse::processOrders() {
     if(choice==2||choice==3) proc(orderQueue, "Normal");
     
     saveInventory(); 
-    saveWorkers(); 
+    saveWorkers(); // Save bonus stats immediately
 }
 
 void Warehouse::viewPendingOrders() {
@@ -403,6 +429,9 @@ void Warehouse::viewPendingOrders() {
 }
 void Warehouse::smartReorder() {}
 
+// ==========================================
+// RETURNS
+// ==========================================
 void Warehouse::returnProduct(int id, int qty) {
     int idx = findProductIndex(id);
     if(idx == -1) { cout << "Not Found.\n"; return; }
@@ -415,6 +444,9 @@ void Warehouse::returnProduct(int id, int qty) {
     cout << "[SUCCESS] Refunded $" << fixed << setprecision(2) << ref << endl;
 }
 
+// ==========================================
+// FILES & UTILS
+// ==========================================
 void Warehouse::saveInventory() {
     ofstream f("inventory.txt");
     f << "Count: " << inventory.size() << endl << "Header" << endl;
@@ -479,13 +511,3 @@ void Warehouse::undoLastAction() {
 }
 
 void Warehouse::debugHistory() { historyStack.printStack(); }
-void Warehouse::clearShiftHistory() {
-    ofstream file("warehouse_report.txt", ios::trunc); // "trunc" erases content
-    if (file) {
-        file << "=== REPORT HISTORY CLEARED ===\n"; // Add a fresh header
-        file.close();
-        cout << "   [SUCCESS] All shift reports have been deleted permanently.\n";
-    } else {
-        cout << "   [ERROR] Could not access report file.\n";
-    }
-}
