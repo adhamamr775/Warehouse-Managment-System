@@ -10,7 +10,7 @@ using namespace std;
 struct CartItem { int id; int qty; };
 
 // ==========================================
-// INPUT HELPERS (Prevents Crashes)
+// INPUT HELPERS
 // ==========================================
 void clearInput() {
     cin.clear();
@@ -88,7 +88,8 @@ void displayMenu(string role) {
         cout << "16. [ADMIN] Remove Worker" << endl;
         cout << "18. [ADMIN] View Staff Stats" << endl;
         cout << "19. [ADMIN] Promote Worker" << endl;
-        cout << "20. [ADMIN] Pay Worker Bonus" << endl; // [NEW]
+        cout << "20. [ADMIN] Pay Worker Bonus" << endl;
+        cout << "21. [ADMIN] Clear Shift History" << endl; // [NEW]
     }
     cout << "0.  End Shift" << endl; 
 }
@@ -287,14 +288,12 @@ int main() {
 
                 case 15: {
                     if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin Only.\n"; break; }
-                    
                     cout << "\n--- Add New Worker ---\n";
                     int nid = getValidInt("New ID: "); 
                     if (mySystem.workerExists(nid)) {
                         cout << "   [ERROR] ID Taken! Try another.\n";
                         break; 
                     }
-
                     string nname = getValidString("Name: "); 
                     string nrole = getValidString("Role: ");
                     mySystem.addNewWorker(nid, nname, nrole);
@@ -327,6 +326,19 @@ int main() {
                     mySystem.listWorkers(); 
                     int pid = getValidInt("Enter Worker ID to Pay: ");
                     mySystem.payWorkerBonus(pid);
+                    break;
+                }
+
+                case 21: {
+                    if (mySystem.getCurrentRole() != "Admin") { cout << "[DENIED] Super Admin Only.\n"; break; }
+                    cout << "\n[WARNING] This will delete ALL past shift reports.\n";
+                    cout << "Are you sure? (y/n): ";
+                    char confirm; cin >> confirm;
+                    if (confirm == 'y' || confirm == 'Y') {
+                        mySystem.clearShiftHistory();
+                    } else {
+                        cout << "[CANCELLED] History safe.\n";
+                    }
                     break;
                 }
 
