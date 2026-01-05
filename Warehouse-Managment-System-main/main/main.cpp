@@ -3,6 +3,7 @@
 #include <string>
 #include <vector> 
 #include <iomanip> 
+#include <cctype>   // Needed for isdigit, isalpha
 #include "warehouse.h" 
 
 using namespace std;
@@ -10,7 +11,7 @@ using namespace std;
 struct CartItem { int id; int qty; };
 
 // ==========================================
-// INPUT HELPERS
+// INPUT HELPERS (VALIDATION)
 // ==========================================
 void clearInput() {
     cin.clear();
@@ -21,13 +22,18 @@ int getValidInt(string prompt) {
     int x;
     while (true) {
         cout << prompt;
-        if (cin >> x) return x;
+        if (cin >> x) {
+            // Check if the next char is a newline (prevents inputs like 10abc)
+            if (cin.peek() == '\n') return x;
+        }
         cout << "   [ERROR] Invalid input. Please enter a number.\n";
         clearInput();
     }
 }
 
-string getValidString(string prompt) {
+// 1. STRICT NAME (No Digits allowed)
+// Used for: Customer Name, Worker Name
+string getValidName(string prompt) {
     string s;
     while (true) {
         cout << prompt;
@@ -36,18 +42,76 @@ string getValidString(string prompt) {
         
         bool valid = true;
         if (s.empty()) valid = false;
-        for (char c : s) if (isdigit(c)) valid = false; 
+        
+        // Scan for digits
+        for (char c : s) {
+            if (isdigit(c)) {
+                valid = false;
+                break;
+            }
+        }
 
         if (valid) return s;
-        cout << "   [ERROR] Text only (no numbers allowed).\n";
+        cout << "   [ERROR] Names cannot contain numbers. Try again.\n";
     }
 }
 
-string cleanInput(string input) {
-    if (input.empty()) return "Cash";
-    for (char &c : input) c = tolower(c);
-    if (isalpha(input[0])) input[0] = toupper(input[0]);
-    return input;
+// 2. STRICT PHONE (Digits Only)
+// Used for: Customer Phone
+string getValidPhone(string prompt) {
+    string s;
+    while (true) {
+        cout << prompt;
+        cin >> s;
+        
+        bool valid = true;
+        // Check length (optional, e.g., must be > 3 digits)
+        if (s.length() < 3) valid = false;
+
+        // Scan for non-digits
+        for (char c : s) {
+            if (!isdigit(c)) {
+                valid = false;
+                break;
+            }
+        }
+
+        if (valid) return s;
+        cout << "   [ERROR] Invalid Phone. Must be digits only (0-9).\n";
+        clearInput(); // Clear buffer in case of messy input
+    }
+}
+
+// 3. STRICT PAYMENT MENU (Like Shift Selection)
+string getPaymentMethod() {
+    int choice;
+    while (true) {
+        cout << "\n   --- Select Payment Method ---\n";
+        cout << "   1. Cash\n";
+        cout << "   2. Visa / Mastercard\n";
+        cout << "   3. Instapay / Wallet\n";
+        cout << "   Select: ";
+        if (cin >> choice) {
+            if (choice == 1) return "Cash";
+            if (choice == 2) return "Visa/Mastercard";
+            if (choice == 3) return "Instapay";
+        }
+        cout << "   [ERROR] Invalid selection. Try 1, 2, or 3.\n";
+        clearInput();
+    }
+}
+
+// Flexible String (Allows numbers and text)
+// Used for: Product Name, Supplier
+string getLineString(string prompt) {
+    string s;
+    while (true) {
+        cout << prompt;
+        if (cin.peek() == '\n') cin.ignore(); 
+        getline(cin, s);
+        if (!s.empty()) return s;
+        cout << "   [ERROR] Input cannot be empty.\n";
+    }
 }
 
 string formatName(string name) {
@@ -58,7 +122,7 @@ string formatName(string name) {
 }
 
 // ==========================================
-// MENU
+// MENU & UI
 // ==========================================
 void displayMenu(string role) {
     cout << "\n==========================================" << endl;
@@ -89,7 +153,7 @@ void displayMenu(string role) {
         cout << "18. [ADMIN] View Staff Stats" << endl;
         cout << "19. [ADMIN] Promote Worker" << endl;
         cout << "20. [ADMIN] Pay Worker Bonus" << endl;
-        cout << "21. [ADMIN] Clear Shift History" << endl; // [NEW]
+        cout << "21. [ADMIN] Clear Shift History" << endl; 
     }
     cout << "0.  End Shift" << endl; 
 }
@@ -154,13 +218,13 @@ int main() {
                     int id = getValidInt("Product ID: ");
                     if (mySystem.searchUsingTree(id)) { cout << "[ERROR] ID Exists!\n"; break; }
                     
-                    string name = getValidString("Name: ");
+                    string name = getLineString("Name: ");
                     int qty = getValidInt("Quantity: ");
                     double price, cost;
                     cout << "Selling Price: "; cin >> price;
                     cout << "Cost Price: "; cin >> cost;
-                    string cat = getValidString("Category: ");
-                    string supp = getValidString("Supplier: ");
+                    string cat = getLineString("Category: ");
+                    string supp = getLineString("Supplier: ");
                     
                     mySystem.addProduct(id, name, qty, price, cost, cat, supp);
                     break;
@@ -180,32 +244,39 @@ int main() {
                     string type = (choice == 4) ? "NORMAL" : "VIP";
                     vector<CartItem> tempCart; 
                     
-                    cout << "\n--- " << type << " Cart ---\n";
-                    string cName = getValidString("Customer Name: ");
-                    string cPhone; cout << "Phone: "; cin >> cPhone; 
-                    string pMethod = getValidString("Payment Method: ");
+                    // [REQUESTED FEATURE] Show Inventory First
+                    mySystem.listInventory(); 
+
+                    cout << "\n--- " << type << " Cart Entry ---\n";
+                    
+                    // [REQUESTED FEATURE] Strict Inputs
+                    string cName = getValidName("Customer Name: ");     // No Numbers
+                    string cPhone = getValidPhone("Customer Phone: ");  // No Letters
+                    string pMethod = getPaymentMethod();                // Menu Selection
 
                     while(true) {
+                        cout << "\n[Add to Cart] ";
                         int id = getValidInt("Product ID (0 to finish): ");
                         if (id == 0) break;
 
                         if(mySystem.searchUsingTree(id)) { 
                             string pName = mySystem.getProductName(id); 
                             int stock = mySystem.getProductQuantity(id);
-                            cout << " -> Selected: " << pName << " (Stock: " << stock << ")\n";
+                            cout << " -> Found: " << pName << " (In Stock: " << stock << ")\n";
                             
-                            int qty = getValidInt("Quantity: ");
-                            if (qty > stock) { cout << " [ERROR] Max stock is " << stock << endl; continue; }
-                            if (qty <= 0) { cout << " [ERROR] Invalid qty.\n"; continue; }
+                            int qty = getValidInt("   Quantity: ");
+                            if (qty > stock) { cout << "   [ERROR] Not enough stock.\n"; continue; }
+                            if (qty <= 0) { cout << "   [ERROR] Invalid qty.\n"; continue; }
 
                             tempCart.push_back({id, qty});
-                            cout << " [Cart] Added.\n"; 
-                        } else cout << " [ERROR] Not found.\n";
+                            cout << "   [OK] Added to cart.\n"; 
+                        } else cout << "   [ERROR] Product ID not found.\n";
                     }
 
                     if (tempCart.empty()) { cout << "[CANCELLED] Cart Empty.\n"; break; }
 
                     cout << "\n--- Confirm " << type << " Order ---\n";
+                    cout << "Customer: " << cName << " | Phone: " << cPhone << " | Pay: " << pMethod << endl;
                     cout << left << setw(5) << "ID" << setw(20) << "Name" << setw(10) << "Qty" << setw(10) << "Price" << endl;
                     double total = 0;
                     for(auto &i : tempCart) {
@@ -219,12 +290,12 @@ int main() {
 
                     char confirm; cout << "Confirm (y/n): "; cin >> confirm;
                     if (confirm == 'y' || confirm == 'Y') {
-                        mySystem.logEvent(">>> NEW CART [" + type + "] Customer: " + cName);
+                        mySystem.logEvent(">>> NEW ORDER [" + type + "] " + cName);
                         for (auto &i : tempCart) {
                             if (choice == 4) mySystem.addToOrderQueue(i.id, i.qty, pMethod, cName, cPhone);
                             else mySystem.addVIPOrder(i.id, i.qty, pMethod, cName, cPhone);
                         }
-                        cout << "[SUCCESS] Sent to Queue.\n";
+                        cout << "[SUCCESS] Sent to Order Queue.\n";
                     } else cout << "[CANCELLED]\n";
                     break;
                 }
@@ -287,18 +358,30 @@ int main() {
                 }
 
                 case 15: {
-                    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin Only.\n"; break; }
-                    cout << "\n--- Add New Worker ---\n";
-                    int nid = getValidInt("New ID: "); 
-                    if (mySystem.workerExists(nid)) {
-                        cout << "   [ERROR] ID Taken! Try another.\n";
-                        break; 
-                    }
-                    string nname = getValidString("Name: "); 
-                    string nrole = getValidString("Role: ");
-                    mySystem.addNewWorker(nid, nname, nrole);
-                    break;
-                }
+    if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin Only.\n"; break; }
+    cout << "\n--- Add New Worker ---\n";
+    int nid = getValidInt("New ID: "); 
+    
+    if (mySystem.workerExists(nid)) {
+        cout << "   [ERROR] ID Taken! Try another.\n";
+        break; 
+    }
+    
+    string nname = getValidName("Name: "); 
+    string nrole = getValidName("Role: ");
+    
+    // --- NEW: ASK FOR SALARY ---
+    double nsalary;
+    cout << "Salary: "; 
+    while(!(cin >> nsalary)) { // Basic validation for double
+        cout << "Invalid number. Salary: ";
+        cin.clear(); cin.ignore(1000, '\n');
+    }
+    
+    // Pass salary to the function
+    mySystem.addNewWorker(nid, nname, nrole, nsalary);
+    break;
+}
                 
                 case 16: {
                     if (mySystem.getCurrentRole() == "Worker") { cout << "[DENIED] Admin Only.\n"; break; }
@@ -328,18 +411,13 @@ int main() {
                     mySystem.payWorkerBonus(pid);
                     break;
                 }
-                case 21: {
-                    // [UPDATED] Allow both Admin AND Manager
-                    string r = mySystem.getCurrentRole();
-                    if (r != "Admin" && r != "Manager") { 
-                        cout << "[DENIED] Admin or Manager Only.\n"; 
-                        break; 
-                    }
 
+                case 21: {
+                    string r = mySystem.getCurrentRole();
+                    if (r != "Admin" && r != "Manager") { cout << "[DENIED] Admin or Manager Only.\n"; break; }
                     cout << "\n[WARNING] This will delete ALL past shift reports.\n";
                     cout << "Are you sure? (y/n): ";
                     char confirm; cin >> confirm;
-                    
                     if (confirm == 'y' || confirm == 'Y') {
                         mySystem.clearShiftHistory();
                     } else {
