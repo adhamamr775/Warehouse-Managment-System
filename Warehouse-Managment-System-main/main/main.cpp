@@ -2,7 +2,7 @@
 #include <limits>
 #include <string>
 #include <vector> 
-#include <iomanip> // [ADDED] Needed for neat tables
+#include <iomanip> 
 #include "warehouse.h" 
 
 using namespace std;
@@ -46,8 +46,8 @@ void displayMenu(string role) {
     cout << "1.  Add New Product" << endl;
     cout << "2.  View Inventory" << endl;
     cout << "3.  Search Product" << endl; 
-    cout << "4.  Place Normal Order (Cart & Confirm)" << endl; 
-    cout << "5.  Place VIP Order (Cart & Confirm)" << endl;    
+    cout << "4.  Place Normal Order " << endl; 
+    cout << "5.  Place VIP Order " << endl;    
     cout << "6.  Process All Orders" << endl;  
     cout << "7.  Show Storage Layout" << endl; 
     cout << "8.  Sort Inventory by ID" << endl;
@@ -86,13 +86,27 @@ int main() {
         cout << "   (Type '0' to Shutdown)                 " << endl;
         cout << "------------------------------------------" << endl;
 
-        cout << "Enter Shift Name: ";
-        cin.clear();
-        getline(cin, shift);
-        
-        if (shift == "0") return 0;
-        shift = formatName(shift); 
+        // --- 1. SHIFT VALIDATION LOOP (NEW) ---
+        while (true) {
+            cout << "Enter Shift Name (Morning/Night): ";
+            cin.clear();
+            getline(cin, shift);
+            
+            if (shift == "0") {
+                cout << "System Shutting Down..." << endl;
+                return 0;
+            }
 
+            shift = formatName(shift); // Auto-fix: "morning" -> "Morning"
+
+            if (shift == "Morning" || shift == "Night") {
+                break; // Input is valid, exit the loop
+            } else {
+                cout << "[ERROR] Invalid Shift. Please enter 'Morning' or 'Night'.\n";
+            }
+        }
+
+        // --- 2. SECURE ID CHECK ---
         string dbName, dbRole;
         
         while (!isAuthenticated) {
@@ -186,9 +200,21 @@ int main() {
                         if (id == 0) break;
 
                         if(mySystem.searchUsingTree(id)) { 
-                            string pName = mySystem.getProductName(id); // [NEW] Show name immediately
-                            cout << "  -> Selected: " << pName << "\n";
+                            string pName = mySystem.getProductName(id); 
+                            int stock = mySystem.getProductQuantity(id);
+
+                            cout << "  -> Selected: " << pName << " (Available: " << stock << ")\n";
                             cout << "  Quantity: "; cin >> qty; 
+
+                            if (qty > stock) {
+                                cout << "  [ERROR] Not enough stock! Max: " << stock << endl;
+                                continue;
+                            }
+                            if (qty <= 0) {
+                                cout << "  [ERROR] Invalid quantity." << endl;
+                                continue;
+                            }
+
                             tempCart.push_back({id, qty});
                             cout << "  [Cart] Item Added.\n"; 
                         } else {
