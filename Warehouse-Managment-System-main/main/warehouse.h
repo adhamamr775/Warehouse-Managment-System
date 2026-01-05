@@ -7,7 +7,6 @@
 #include <iostream>
 #include <iomanip>
 
-// Includes for your custom data structures
 #include "product.h" 
 #include "../header/DataStructures/BST.h"
 #include "../header/DataStructures/queue.h" 
@@ -18,36 +17,32 @@
 
 using namespace std;
 
-// Struct to hold worker details from workers.txt
 struct WorkerRecord {
     int id;
     string name;
-    string role; // "Admin", "Manager", "Worker"
+    string role; 
+    int normalCount;       
+    double batchProfit;    
+    double totalEarnings;  
+    int totalOrders;       
 };
 
 class Warehouse {
 private:
-    // Core Data
     vector<Product> inventory;
     BST idIndex;
     LinkedList layout;
-    
-    // Orders
     Queue orderQueue;
     Queue vipQueue;
     Stack historyStack;
-    
-    // Worker Management
     BST workerDB; 
     vector<WorkerRecord> staffList; 
     
-    // Financials (Lifetime)
     double revenue = 0.0;     
     double netProfit = 0.0;   
     double taxCollected = 0.0;
-    vector<string> salesLog; // Lifetime log
+    vector<string> salesLog; 
 
-    // Session / Shift Data
     string currentShiftName;
     string operatorName;
     int operatorID = 0;       
@@ -56,26 +51,28 @@ private:
     double sessionRevenue = 0.0;
     double sessionProfit = 0.0;
     int sessionItemsSold = 0;
-    vector<string> sessionSalesLog; // Current shift log
+    vector<string> sessionSalesLog; 
 
 public:
     Warehouse();
     
-    // --- WORKER MANAGEMENT ---
     void loadWorkers();             
     void saveWorkers();             
     bool validateLogin(int id, string &retName, string &retRole); 
     void addNewWorker(int id, string name, string role);
+    bool workerExists(int id);
     void removeWorker(int id);
+    void promoteWorker(int id); 
+    void payWorkerBonus(int id); // [NEW]
+    void listWorkers(); 
+    
     string getCurrentRole() { return operatorRole; } 
-    string getWorkerRole(int id); // Helper for Manager Override
+    string getWorkerRole(int id); 
 
-    // --- SHIFT CONTROL ---
     void startShift(string shiftName, string opName, int opID, string role); 
     void endShift();
 
-    // --- INVENTORY ---
-    void addProduct(int id, string name, int quantity, double price, double cost, string category, string supplier);
+    void addProduct(int id, string name, int quantity, double price, double cost, string category, string supplier, bool silent = false);
     void listInventory();
     int findProductIndex(int id);
     bool searchUsingTree(int id);
@@ -83,28 +80,26 @@ public:
     void manualRestock(int id, int qty);
     void peekProduct(int id);
     
-    // --- ORDERS & QUEUES ---
     void addToOrderQueue(int id, int qty, string payment, string name, string phone);
     void addVIPOrder(int id, int qty, string payment, string name, string phone);
-    void processOrders();     // UPDATED: Selective Processing + VIP Pricing
+    void processOrders();     
     void viewPendingOrders(); 
     void smartReorder();
     
-    // --- RETURNS ---
-    void returnProduct(int id, int qty); // UPDATED: Handles refunds
+    void returnProduct(int id, int qty); 
 
-    // --- UNDO / DEBUG ---
     void undoLastAction();
     void debugHistory(); 
     
-    // --- REPORTS & FILES ---
     void showStorageLayout();
     void exportToFile();
     void saveInventory();
     void loadInventory();
     void showRevenue();
+    void logEvent(string message); 
+    void printShiftReport();       
+    void archiveShift();           
     
-    // --- SORTING ---
     void sortByID();
     void sortByPrice();
     string getProductName(int id); 
