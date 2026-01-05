@@ -521,3 +521,8 @@ void Warehouse::undoLastAction() {
 void Warehouse::debugHistory() {
     historyStack.printStack();
 }
+int Warehouse::getProductQuantity(int id) {
+    int idx = findProductIndex(id);
+    if (idx != -1) return inventory[idx].getQuantity();
+    return 0;
+}
