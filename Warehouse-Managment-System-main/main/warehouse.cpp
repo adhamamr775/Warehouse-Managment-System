@@ -479,3 +479,13 @@ void Warehouse::undoLastAction() {
 }
 
 void Warehouse::debugHistory() { historyStack.printStack(); }
+void Warehouse::clearShiftHistory() {
+    ofstream file("warehouse_report.txt", ios::trunc); // "trunc" erases content
+    if (file) {
+        file << "=== REPORT HISTORY CLEARED ===\n"; // Add a fresh header
+        file.close();
+        cout << "   [SUCCESS] All shift reports have been deleted permanently.\n";
+    } else {
+        cout << "   [ERROR] Could not access report file.\n";
+    }
+}
