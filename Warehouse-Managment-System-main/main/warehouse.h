@@ -98,7 +98,8 @@ public:
     void showRevenue();
     void logEvent(string message); 
     void printShiftReport();       
-    void archiveShift();           
+    void archiveShift();
+    void clearShiftHistory();           
     
     void sortByID();
     void sortByPrice();
