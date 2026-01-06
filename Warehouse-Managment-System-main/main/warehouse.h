@@ -10,31 +10,31 @@
 #include "product.h" 
 #include "../header/DataStructures/BST.h"
 #include "../header/DataStructures/queue.h" 
-#include "../header/DataStructures/stack.h"
+#include "../header/DataStructures/stack.h" 
 #include "../header/DataStructures/Linkedlist.h"
 #include "../header/algos/Searching.h"
 #include "../header/algos/sorting.h"
 
 using namespace std;
+
+// ==========================================
+// WORKER RECORD STRUCT
+// ==========================================
 struct WorkerRecord {
-    // --- IDENTITY ---
     int id;
     string name;
     string role; 
-
-    // --- FINANCIALS (New!) ---
-    double salary;          // Base Salary (Needed for % calculation)
-    double totalEarnings;   // This acts as the "Wallet" for bonuses
-
-    // --- METRICS ---
-    int totalOrders;        // Total lifetime orders
-    int vipOrders;          // Count of VIP orders (New!)
-
-    // --- INTERNAL TRACKERS (For Batch Logic) ---
-    int normalCount;        // Tracks progress (e.g., 3/5 orders)
-    double batchProfit;     // Temporary profit pool for the current batch
+    double salary;          // Base Salary
+    double totalEarnings;   // The Wallet
+    int totalOrders;        
+    int vipOrders;          
+    int normalCount;        // 0-4 for batch tracking
+    double batchProfit;     // Accrued profit for next bonus
 };
 
+// ==========================================
+// WAREHOUSE CLASS
+// ==========================================
 class Warehouse {
 private:
     vector<Product> inventory;
@@ -64,22 +64,25 @@ private:
 public:
     Warehouse();
     
+    // Worker Management
     void loadWorkers();             
     void saveWorkers();             
     bool validateLogin(int id, string &retName, string &retRole); 
-   void addNewWorker(int id, string name, string role, double salary);
+    void addNewWorker(int id, string name, string role, double salary);
     bool workerExists(int id);
     void removeWorker(int id);
     void promoteWorker(int id); 
-    void payWorkerBonus(int id); // [NEW]
+    void payWorkerBonus(int id); 
     void listWorkers(); 
     
     string getCurrentRole() { return operatorRole; } 
     string getWorkerRole(int id); 
 
+    // Shift Logic
     void startShift(string shiftName, string opName, int opID, string role); 
     void endShift();
 
+    // Inventory Logic
     void addProduct(int id, string name, int quantity, double price, double cost, string category, string supplier, bool silent = false);
     void listInventory();
     int findProductIndex(int id);
@@ -88,6 +91,7 @@ public:
     void manualRestock(int id, int qty);
     void peekProduct(int id);
     
+    // Order Logic
     void addToOrderQueue(int id, int qty, string payment, string name, string phone);
     void addVIPOrder(int id, int qty, string payment, string name, string phone);
     void processOrders();     
@@ -96,9 +100,11 @@ public:
     
     void returnProduct(int id, int qty); 
 
+    // History & Undo
     void undoLastAction();
     void debugHistory(); 
     
+    // Files & Utils
     void showStorageLayout();
     void exportToFile();
     void saveInventory();
@@ -109,6 +115,7 @@ public:
     void archiveShift();
     void clearShiftHistory();           
     
+    // Algos
     void sortByID();
     void sortByPrice();
     string getProductName(int id); 
