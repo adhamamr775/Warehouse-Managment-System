@@ -47,12 +47,28 @@ bool Stack::isEmpty() {
     return top == nullptr;
 }
 void Stack::printStack() {
-    StackNode* current = top;
-    cout << "Stack contents (top to bottom):" << endl;
-    while (current != nullptr) {
-        cout << "Action Type: " << current->data.type 
-             << ", Product ID: " << current->data.productID 
-             << ", Quantity: " << current->data.quantity << endl;
-        current = current->next;
+    if (isEmpty()) {
+        cout << "   [Stack is Empty]\n";
+        return;
     }
+    StackNode* temp = top;
+    cout << "\n--- History Stack (Top to Bottom) ---\n";
+    while (temp != nullptr) {
+        string typeStr;
+        
+        // Use the actual enum names here instead of 0, 1, 2...
+        switch (temp->data.type) {
+            case ADD_PRODUCT:     typeStr = "ADD PRODUCT   "; break;
+            case DELETE_PRODUCT:  typeStr = "DELETE PRODUCT"; break;
+            case RESTOCK_PRODUCT: typeStr = "RESTOCK        "; break;
+            case SELL_PRODUCT:    typeStr = "SELL           "; break;
+            default:              typeStr = "UNKNOWN        ";
+        }
+        
+        cout << " >> " << typeStr << " | ID: " << temp->data.productID 
+             << " | Item: " << temp->data.p.getName() << endl;
+        
+        temp = temp->next;
+    }
+    cout << "-------------------------------------\n";
 }
