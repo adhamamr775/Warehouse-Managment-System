@@ -32,7 +32,6 @@ int getValidInt(string prompt) {
 }
 
 // 1. STRICT NAME (No Digits allowed)
-// Used for: Customer Name, Worker Name
 string getValidName(string prompt) {
     string s;
     while (true) {
@@ -56,8 +55,6 @@ string getValidName(string prompt) {
     }
 }
 
-// 2. STRICT PHONE (Digits Only)
-// Used for: Customer Phone
 string getValidPhone(string prompt) {
     string s;
     while (true) {
@@ -82,7 +79,6 @@ string getValidPhone(string prompt) {
     }
 }
 
-// 3. STRICT PAYMENT MENU (Like Shift Selection)
 string getPaymentMethod() {
     int choice;
     while (true) {
@@ -121,9 +117,6 @@ string formatName(string name) {
     return name;
 }
 
-// ==========================================
-// MENU & UI
-// ==========================================
 void displayMenu(string role) {
     cout << "\n==========================================" << endl;
     cout << "    SMART WAREHOUSE SYSTEM    " << endl;
@@ -158,9 +151,7 @@ void displayMenu(string role) {
     cout << "0.  End Shift" << endl; 
 }
 
-// ==========================================
-// MAIN LOGIC
-// ==========================================
+
 int main() {
     Warehouse mySystem;
     
@@ -328,12 +319,19 @@ int main() {
                     mySystem.manualRestock(id, q); break; 
                 }
 
-                case 14: 
-                    mySystem.debugHistory(); 
-                    cout << "Undo? (y/n): "; char c; cin >> c; 
-                    if(c=='y'||c=='Y') mySystem.undoLastAction(); 
-                    break;
-                
+                case 14: {
+    mySystem.debugHistory(); 
+    cout << "Undo last action? (y/n): "; 
+    char confirm; 
+    cin >> confirm; 
+    
+    if(confirm == 'y' || confirm == 'Y') {
+        mySystem.undoLastAction(); 
+    } else {
+        cout << "[INFO] Undo cancelled.\n";
+    }
+    break;
+}
                 case 17: {
                     cout << "\n--- Process Return ---\n";
                     char w; cout << "Warranty Valid? (y/n): "; cin >> w;
