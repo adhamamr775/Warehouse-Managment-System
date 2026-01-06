@@ -47,8 +47,6 @@ void Warehouse::loadWorkers() {
             string segment;
             vector<string> tokens;
             while(getline(ss, segment, '|')) tokens.push_back(segment);
-
-            // WE NOW EXPECT 7 COLUMNS: 
             // ID | Name | Role | Salary | TotalOrders | VIPOrders | Wallet
             if (tokens.size() >= 7) { 
                 try {
@@ -74,7 +72,6 @@ void Warehouse::loadWorkers() {
         file.close();
     }
 
-    // Fail-safe: Create Admin if empty
     if (staffList.empty()) {
         cout << "[SYSTEM] No workers found. Creating Default Admin.\n";
         // ID, Name, Role, Salary, Wallet, TotalOrders, VIP, NormalCount, BatchProf
@@ -85,10 +82,8 @@ void Warehouse::loadWorkers() {
 }
 void Warehouse::saveWorkers() {
     ofstream file("workers.txt");
-    // 1. WRITE THE CORRECT HEADER
+    //Header
     file << "ID|Name|Role|Salary|TotalOrders|VIPOrders|Wallet" << endl;
-    
-    // 2. WRITE DATA IN CORRECT ORDER
     for (const auto& w : staffList) {
         file << w.id << "|" 
              << w.name << "|" 
@@ -102,7 +97,6 @@ void Warehouse::saveWorkers() {
 }
 
 bool Warehouse::validateLogin(int id, string &retName, string &retRole) {
-    // Iterate the vector directly (Safer than tree if tree isn't synced)
     for (const auto& w : staffList) {
         if (w.id == id) { 
             retName = w.name; 
@@ -113,7 +107,6 @@ bool Warehouse::validateLogin(int id, string &retName, string &retRole) {
     return false;
 }
 
-// ... (Rest of your functions remain exactly the same as you provided) ...
 
 void Warehouse::payWorkerBonus(int id) {
     bool found = false;
@@ -163,7 +156,6 @@ void Warehouse::addNewWorker(int id, string name, string role, double salary) {
         if(w.id == id) { cout << "[ERROR] ID Exists!\n"; return; }
     }
 
-    // Create the worker with the Salary
     // ID, Name, Role, Salary, Wallet, TotalOrders, VIP, NormalCount, BatchProfit
     WorkerRecord w = {id, name, role, salary, 0.0, 0, 0, 0, 0.0};
     
@@ -184,7 +176,6 @@ void Warehouse::removeWorker(int id) {
         }
     }
     if (found) {
-        // workerDB.root = workerDB.deleteNode(workerDB.root, id); // Optional
         saveWorkers();
         cout << "[SUCCESS] Worker removed.\n";
     } else cout << "[ERROR] Not found.\n";
@@ -324,11 +315,15 @@ void Warehouse::addProduct(int id, string name, int quantity, double price, doub
     idIndex.root = idIndex.insertNode(idIndex.root, id);
     layout.append(id);
     bubbleSort(inventory); 
+
+    
+    Action act = {ADD_PRODUCT, id, quantity, p}; 
+    historyStack.push(act);
+
     
     saveInventory();
     if (!silent) cout << "[OK] Added: " << name << "\n";
 }
-
 int Warehouse::findProductIndex(int id) { return binarySearchRec(inventory, 0, inventory.size() - 1, id); }
 bool Warehouse::searchUsingTree(int id) { return idIndex.searchNode(idIndex.root, id); }
 
@@ -345,18 +340,19 @@ void Warehouse::removeProduct(int id) {
     int idx = findProductIndex(id);
     if(idx == -1) { cout << "Not Found.\n"; return; }
     
-    Product p = inventory[idx];
+    Product p = inventory[idx]; // Keep a copy for undoing
+    
     inventory.erase(inventory.begin() + idx);
     idIndex.root = idIndex.deleteNode(idIndex.root, id);
     layout.removeNode(id);
     
+    // This pushes the action correctly
     Action act = {DELETE_PRODUCT, id, 0, p}; 
     historyStack.push(act);
     
     saveInventory();
     cout << "[OK] Deleted.\n";
 }
-
 void Warehouse::manualRestock(int id, int qty) {
     int idx = findProductIndex(id);
     if(idx == -1) { cout << "Not Found.\n"; return; }
@@ -417,10 +413,6 @@ void Warehouse::processOrders() {
                 if(type=="VIP") sub *= 1.10; // VIP Markup
                 
                 double itemProfit = (sub - (cost * o.qty)); 
-
-                // ---------------------------------------------
-                // BONUS LOGIC
-                // ---------------------------------------------
                 if(currentWorker != nullptr) {
                     currentWorker->totalOrders++; 
 
@@ -487,7 +479,7 @@ void Warehouse::processOrders() {
     if(choice==2||choice==3) proc(orderQueue, "Normal");
     
     saveInventory(); 
-    saveWorkers(); // Crucial: Save bonus stats immediately
+    saveWorkers(); 
 }
 
 void Warehouse::viewPendingOrders() {
@@ -571,7 +563,20 @@ void Warehouse::showRevenue() {
 }
 
 void Warehouse::showStorageLayout() { layout.printList(); cout << endl; }
-void Warehouse::sortByID() { bubbleSort(inventory); cout << "Sorted ID.\n"; }
+void Warehouse::sortByID() { 
+    // 1. Sort the vector (Inventory)
+    bubbleSort(inventory); 
+
+    // 2. Wipe the visual layout (Linked List)
+    layout.clear(); 
+
+    // 3. Re-append IDs from the NOW SORTED vector into the layout
+    for(const auto& p : inventory) {
+        layout.append(p.getId());
+    }
+
+    cout << "[SUCCESS] Inventory sorted. Storage layout updated.\n";
+}
 void Warehouse::sortByPrice() { 
     for(size_t i=0; i<inventory.size()-1; i++) 
         for(size_t j=0; j<inventory.size()-i-1; j++) 
@@ -580,18 +585,45 @@ void Warehouse::sortByPrice() {
 }
 
 void Warehouse::undoLastAction() {
-    if(historyStack.isEmpty()) { cout << "Nothing to undo.\n"; return; }
+    if(historyStack.isEmpty()) { 
+        cout << "   [INFO] Nothing to undo.\n"; 
+        return; 
+    }
+    
     Action a = historyStack.pop();
-    if(a.type == ADD_PRODUCT) removeProduct(a.productID);
+    
+    // CASE A: Undoing a Delete -> Put it back
+    if(a.type == DELETE_PRODUCT) {
+        inventory.push_back(a.p); 
+        idIndex.root = idIndex.insertNode(idIndex.root, a.productID);
+        layout.append(a.productID);
+        bubbleSort(inventory); 
+        cout << "   [UNDO] Restored: " << a.p.getName() << endl;
+    }
+    // CASE B: Undoing an Add -> Remove it
+    else if(a.type == ADD_PRODUCT) {
+        // We use our existing remove function, but we wrap it to be silent
+        int idToRemove = a.productID;
+        int idx = findProductIndex(idToRemove);
+        if(idx != -1) {
+            inventory.erase(inventory.begin() + idx);
+            idIndex.root = idIndex.deleteNode(idIndex.root, idToRemove);
+            layout.removeNode(idToRemove);
+            cout << "   [UNDO] Removed accidentally added product ID: " << idToRemove << endl;
+        }
+    }
+    // CASE C: Undoing Restock or Sell -> Reverse the quantity
     else if(a.type == RESTOCK_PRODUCT || a.type == SELL_PRODUCT) {
         int idx = findProductIndex(a.productID);
         if(idx != -1) {
+            // If we restocked, we now sell (subtract)
             if (a.type == RESTOCK_PRODUCT) inventory[idx].sell(a.quantity);
+            // If we sold, we now restock (add)
             else inventory[idx].restock(a.quantity);
+            cout << "   [UNDO] Quantity change reversed for ID: " << a.productID << endl;
         }
     }
+    
     saveInventory();
-    cout << "Undone.\n";
 }
-
 void Warehouse::debugHistory() { historyStack.printStack(); }
