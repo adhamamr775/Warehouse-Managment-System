@@ -1,19 +1,21 @@
-#ifndef STACK_H
-#define STACK_H
+#ifndef STACK_H    
+#define STACK_H    
 
 #include <iostream>
 #include <string>
-#include "../../main/product.h" // Needed for saving product state
+#include "../../main/product.h" 
+
 using namespace std;
 
-// Action Type for Undo
+// 1. Action Type for Undo
 enum ActionType { ADD_PRODUCT, SELL_PRODUCT, RESTOCK_PRODUCT, DELETE_PRODUCT };
 
+// 2. Action Structure (Renamed to 'p' to match warehouse.cpp)
 struct Action {
     ActionType type;
     int productID;
     int quantity;
-    Product backupData; // Used when restoring a deleted product
+    Product p; 
 };
 
 // Node Structure
@@ -21,7 +23,7 @@ struct StackNode {
     Action data;
     StackNode* next;
     
-    // Constructor defined in .cpp
+    // Constructor
     StackNode(Action val);
 };
 
@@ -32,7 +34,7 @@ private:
 
 public:
     Stack();
-    ~Stack(); // Destructor
+    ~Stack(); 
 
     void push(Action val);
     Action pop();
@@ -41,4 +43,4 @@ public:
     void printStack();
 };
 
-#endif
+#endif 
